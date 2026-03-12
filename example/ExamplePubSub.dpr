@@ -1,0 +1,344 @@
+program ExamplePubSub;
+
+{$APPTYPE CONSOLE}
+
+{$R *.res}
+
+
+uses
+  System.SysUtils,
+  Redis.Connection.Config in '..\Redis.Connection.Config.pas',
+  Redis.Response in '..\Redis.Response.pas',
+  Redis.PubSub in '..\Redis.PubSub.pas',
+  Redis.Client.Intf in '..\Versione 2.0\Redis.Client.Intf.pas',
+  Redis.Client in '..\Versione 2.0\Redis.Client.pas',
+  Redis.HealthCheck in '..\Versione 2.0\Redis.HealthCheck.pas',
+  Redis.Pool in '..\Versione 2.0\Redis.Pool.pas',
+  Redis.Protocol in '..\Versione 2.0\Redis.Protocol.pas',
+  Redis.Transport.Synapse in '..\Versione 2.0\Redis.Transport.Synapse.pas',
+  Redis.Types in '..\Versione 2.0\Redis.Types.pas';
+
+// ----------------------------------------------------------------------------
+// Pattern 1: Uso diretto del lRedisClient principale per comandi normali + PUBLISH
+// ----------------------------------------------------------------------------
+procedure SimplePublishExample;
+var
+  lConfig: TRedisConnectionConfig;
+  lRedisClient: IRedisClient;
+begin
+  lConfig.Host := 'localhost';
+  lConfig.Port := 6379;
+  lConfig.ConnectionTimeout := 5000;
+  lConfig.ReadTimeout := 30000;
+
+  lRedisClient := TRedisClient.New(lConfig);
+  lRedisClient.Connect;
+  try
+    // Operazioni normali
+    lRedisClient.SetValue('user:1', 'John');
+    Writeln(lRedisClient.Get('user:1').AsString);
+
+    // Pubblica messaggi sulla stessa connessione
+    lRedisClient.Publish('events', 'User logged in');
+    lRedisClient.Publish('notifications', 'Welcome back!');
+  finally
+    lRedisClient.Disconnect;
+  end;
+end;
+
+// ----------------------------------------------------------------------------
+// Pattern 2: Client dedicati per Pub/Sub intensivo
+// ----------------------------------------------------------------------------
+procedure DedicatedClientsExample;
+var
+  lConfig: TRedisConnectionConfig;
+begin
+  lConfig.Host := 'localhost';
+  lConfig.Port := 6379;
+  lConfig.ConnectionTimeout := 5000;
+  lConfig.ReadTimeout := 30000;
+
+  // Client principale per le operazioni normali
+  var lMainClient := TRedisClient.New(lConfig);
+  lMainClient.Connect;
+
+  // Publisher dedicato
+  var lPublisher := lMainClient.CreatePublisher;
+  lPublisher.Connect;
+
+  // Subscriber dedicato
+  var lSubscriber := lMainClient.CreateSubscriber;
+  lSubscriber.Connect;
+
+  try
+    // Configura il Subscriber
+    lSubscriber.Subscribe(['events', 'notifications'],
+      procedure(const Msg: TRedisPubSubMessage)
+      begin
+        Writeln(Format('[%s] %s', [Msg.Channel, Msg.Payload]));
+      end);
+
+    // Avvia l'ascolto in un thread separato
+    var lListenerThread := TRedisPubSubListenerThread.Create(lSubscriber);
+    lListenerThread.Start;
+
+    try
+      // Opera con il client principale
+      lMainClient.SetValue('status', 'active');
+
+      // Pubblica messaggi
+      lPublisher.Publish('events', 'System started');
+      lPublisher.Publish('notifications', 'Ready to process');
+
+      // Continua operazioni
+      Sleep(5000);
+    finally
+      lSubscriber.StopListening;
+      lListenerThread.WaitFor;
+      lListenerThread.Free;
+    end;
+  finally
+    lPublisher.Disconnect;
+    lSubscriber.Disconnect;
+    lMainClient.Disconnect;
+  end;
+end;
+
+// ----------------------------------------------------------------------------
+// Pattern 3: Applicazione completa con gestione eventi
+// ----------------------------------------------------------------------------
+type
+  TRedisEventManager = class(TObject)
+  private
+    FConfig: TRedisConnectionConfig;
+    FMainClient: IRedisClient;
+    FPublisher: IRedisPubSubPublisher;
+    FSubscriber: IRedisPubSubClient;
+    FListenerThread: TRedisPubSubListenerThread;
+    FLogger: IRedisLogger;
+  public
+    constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil); reintroduce;
+    destructor Destroy; override;
+
+    // Operazioni normali
+    procedure SaveData(const aKey, aValue: string);
+    function LoadData(const aKey: string): string;
+
+    // Eventi
+    procedure PublishEvent(const aEventType, aData: string);
+    procedure StartEventListening(aCallback: TRedisMessageCallback);
+    procedure StopEventListening;
+  end;
+
+constructor TRedisEventManager.Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil);
+begin
+  inherited Create;
+  FConfig := aConfig;
+  FLogger := aLogger;
+
+  // Creo e connetto i client
+  FMainClient := TRedisClient.New(FConfig, FLogger);
+  FMainClient.Connect;
+
+  FPublisher := FMainClient.CreatePublisher;
+  FPublisher.Connect;
+
+  FSubscriber := FMainClient.CreateSubscriber;
+  FSubscriber.Connect;
+end;
+
+destructor TRedisEventManager.Destroy;
+begin
+  StopEventListening;
+
+  if Assigned(FPublisher) then
+    FPublisher.Disconnect;
+
+  if Assigned(FSubscriber) then
+    FSubscriber.Disconnect;
+
+  if Assigned(FMainClient) then
+    FMainClient.Disconnect;
+
+  inherited Destroy;
+end;
+
+procedure TRedisEventManager.SaveData(const aKey, aValue: string);
+begin
+  FMainClient.SetValue(aKey, aValue);
+end;
+
+function TRedisEventManager.LoadData(const aKey: string): string;
+var
+  lResponse: IRedisResponse;
+begin
+  lResponse := FMainClient.Get(aKey);
+  if lResponse.IsNull then
+    Result := ''
+  else
+    Result := lResponse.AsString;
+end;
+
+procedure TRedisEventManager.PublishEvent(const aEventType, aData: string);
+begin
+  FPublisher.Publish(aEventType, aData);
+end;
+
+procedure TRedisEventManager.StartEventListening(aCallback: TRedisMessageCallback);
+begin
+  FSubscriber.Subscribe(['user.login', 'user.logout', 'system.error'], aCallback);
+  FListenerThread := TRedisPubSubListenerThread.Create(FSubscriber);
+  FListenerThread.Start;
+end;
+
+procedure TRedisEventManager.StopEventListening;
+begin
+  if Assigned(FSubscriber) and FSubscriber.IsListening then
+  begin
+    FSubscriber.StopListening;
+
+    if Assigned(FListenerThread) then
+    begin
+      FListenerThread.WaitFor;
+      FListenerThread.Free;
+      FListenerThread := nil;
+    end;
+  end;
+end;
+
+// Uso dell'Event lManager
+procedure UseEventManager;
+var
+  lConfig: TRedisConnectionConfig;
+begin
+  lConfig.Host := 'localhost';
+  lConfig.Port := 6379;
+  lConfig.ConnectionTimeout := 5000;
+  lConfig.ReadTimeout := 30000;
+
+  var lManager := TRedisEventManager.Create(lConfig);
+  try
+    // Avvia ascolto eventi
+    lManager.StartEventListening(
+      procedure(const Msg: TRedisPubSubMessage)
+      begin
+        Writeln(Format('Event: %s - %s', [Msg.Channel, Msg.Payload]));
+
+        // Gestisco eventi specifici
+        if Msg.Channel = 'user.login' then
+          Writeln('User logged in!')
+        else if Msg.Channel = 'system.error' then
+          Writeln('ERROR: ' + Msg.Payload);
+      end);
+
+    // Lavoro con i dati
+    lManager.SaveData('user:john', 'John Doe');
+    Writeln('Loaded: ' + lManager.LoadData('user:john'));
+
+    // Pubblico eventi
+    lManager.PublishEvent('user.login', 'john');
+    lManager.PublishEvent('system.error', 'Connection timeout');
+
+    // Attendo
+    Sleep(10000);
+  finally
+    lManager.Free;
+  end;
+end;
+
+procedure MostraMenu;
+begin
+  Writeln;
+  Writeln('=================================');
+  Writeln('  Redis Client con Pub/Sub');
+  Writeln('=================================');
+  Writeln('1. Simple Publish Example');
+  Writeln('2. Dedicated Clients Example');
+  Writeln('3. Use Event Manager');
+  Writeln('0. Esci');
+  Writeln('=================================');
+  Write('Scegli un''opzione (0-3): ');
+end;
+
+procedure EseguiScelta(scelta: Integer);
+begin
+  Writeln;
+  case scelta of
+    1:
+    begin
+      Writeln('Esecuzione SimplePublishExample...');
+      SimplePublishExample;
+      Writeln('SimplePublishExample completato.');
+    end;
+    2:
+    begin
+      Writeln('Esecuzione DedicatedClientsExample...');
+      DedicatedClientsExample;
+      Writeln('DedicatedClientsExample completato.');
+    end;
+    3:
+    begin
+      Writeln('Esecuzione UseEventManager...');
+      UseEventManager;
+      Writeln('UseEventManager completato.');
+    end;
+    0: Writeln('Uscita dal programma...');
+  else
+    Writeln('Opzione non valida!');
+  end;
+  Writeln;
+end;
+
+var
+  scelta: Integer;
+  input: string;
+  continua: Boolean;
+
+begin
+  continua := True;
+
+  try
+    while continua do
+    begin
+      MostraMenu;
+
+      try
+        Readln(input);
+
+        // Gestione input vuoto
+        if input = '' then
+        begin
+          Writeln('Input non valido. Riprova.');
+          Continue;
+        end;
+
+        scelta := StrToInt(input);
+
+        if scelta = 0 then
+          continua := False
+        else
+          EseguiScelta(scelta);
+
+      except
+        on E: EConvertError do
+          Writeln('Errore: Inserisci un numero valido.');
+        on E: Exception do
+          Writeln('Errore: ' + E.Message);
+      end;
+
+      if continua then
+      begin
+        Writeln('Premi INVIO per continuare...');
+        Readln;
+      end;
+    end;
+
+    Writeln('Programma terminato.');
+
+  except
+    on E: Exception do
+      Writeln('Errore critico: ' + E.Message);
+  end;
+end.
+
+

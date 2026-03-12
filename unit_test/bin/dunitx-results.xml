@@ -1,0 +1,205 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<test-results name="D:\lavori_git\vmRedisClient4D\unit_test\bin\RedisClientTests.exe" total="100" errors="4" failures="5" ignored="0" inconclusive="0" not-run="0" skipped="0" invalid="0" date="2026-01-19" time="59.889">
+  <culture-info current-culture="en" current-uiculture="en" />
+  <test-suite type="Assembly" name="RedisClientTests.exe" executed="true" result="Failure" success="False" time="59.889" asserts="0">
+    <results>
+        <test-suite type="Namespace" name="Redis" executed="true" result="Failure" success="False" time="59.888" asserts="0" >
+          <results>
+              <test-suite type="Fixture" name="TRedisClientTests" executed="True" result="Success" success="True" time="1.224" >
+                <results>
+                  <test-case name="Test_Connection_Success" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_Connection_InvalidHost" executed="True" result="Success" success="True" time="0.150" asserts="0" />
+                  <test-case name="Test_Ping_Connected" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_Disconnect_And_Reconnect" executed="True" result="Success" success="True" time="0.010" asserts="0" />
+                  <test-case name="Test_HealthCheck_Detailed" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_SetGet_SimpleValue" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_SetEx_WithExpiration" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_SetNX_OnlyIfNotExists" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_GetEx_WithExpiration" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_GetDel_GetAndDelete" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_Del_SingleKey" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_Del_MultipleKeys" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_Exists_SingleKey" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_Exists_MultipleKeys" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_Expire_SetTTL" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_TTL_GetTimeToLive" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_Scan_WithPattern" executed="True" result="Success" success="True" time="0.004" asserts="0" />
+                  <test-case name="Test_Append_AppendToString" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_Incr_IncrementCounter" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_IncrBy_IncrementByAmount" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_Decr_DecrementCounter" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_DecrBy_DecrementByAmount" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_StrLen_GetStringLength" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_LPush_AddToListLeft" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_RPush_AddToListRight" executed="True" result="Success" success="True" time="0.004" asserts="0" />
+                  <test-case name="Test_LPop_RemoveFromListLeft" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_RPop_RemoveFromListRight" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_LLen_GetListLength" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_LRange_GetListRange" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_LIndex_GetElementByIndex" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_SAdd_AddToSet" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_SRem_RemoveFromSet" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="Test_SMembers_GetAllMembers" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_SIsMember_CheckMembership" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_SCard_GetSetCardinality" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="Test_SScan_ScanSetMembers" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="Test_HSet_SetHashField" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_HGet_GetHashField" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_HGetAll_GetAllFields" executed="True" result="Success" success="True" time="0.005" asserts="0" />
+                  <test-case name="Test_HDel_DeleteHashFields" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_HExists_CheckFieldExists" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_HKeys_GetAllKeys" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_HVals_GetAllValues" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_HLen_GetHashLength" executed="True" result="Success" success="True" time="0.001" asserts="0" />
+                  <test-case name="Test_HScan_ScanHashFields" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="Test_ZAdd_AddToSortedSet" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_ZRem_RemoveFromSortedSet" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_ZScore_GetMemberScore" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_ZCard_GetSortedSetCardinality" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_ZRange_GetRangeByRank" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_ZScan_ScanSortedSet" executed="True" result="Success" success="True" time="0.003" asserts="0" />
+                  <test-case name="Test_Transaction_MultiExec_Success" executed="True" result="Success" success="True" time="0.002" asserts="0" />
+                  <test-case name="Test_Transaction_Discard" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_Validation_EmptyKey" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_Validation_NegativeExpiration" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_Validation_EmptyArray" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TRedisPoolTests" executed="True" result="Success" success="True" time="5.128" >
+                <results>
+                  <test-case name="Test_PoolConfig_DefaultValues" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_PoolConfig_Validation_InvalidMin" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_PoolConfig_Validation_MaxLessThanMin" executed="True" result="Success" success="True" time="0.000" asserts="0" />
+                  <test-case name="Test_Pool_Initialize_Success" executed="True" result="Success" success="True" time="0.013" asserts="0" />
+                  <test-case name="Test_Pool_Initialize_CreatesMinConnections" executed="True" result="Success" success="True" time="0.011" asserts="0" />
+                  <test-case name="Test_Pool_Initialize_AlreadyInitialized" executed="True" result="Success" success="True" time="0.031" asserts="0" />
+                  <test-case name="Test_Pool_AcquireRelease_SingleConnection" executed="True" result="Success" success="True" time="0.015" asserts="0" />
+                  <test-case name="Test_Pool_Acquire_MultipleConnections" executed="True" result="Success" success="True" time="0.029" asserts="0" />
+                  <test-case name="Test_Pool_Acquire_ReusesIdleConnections" executed="True" result="Success" success="True" time="0.017" asserts="0" />
+                  <test-case name="Test_Pool_Acquire_CreatesNewWhenNeeded" executed="True" result="Success" success="True" time="0.057" asserts="0" />
+                  <test-case name="Test_Pool_Acquire_TimeoutWhenPoolSaturated" executed="True" result="Success" success="True" time="2.072" asserts="0" />
+                  <test-case name="Test_Pool_Release_InvalidConnection" executed="True" result="Success" success="True" time="0.031" asserts="0" />
+                  <test-case name="Test_Pool_ThreadSafety_MultipleThreads" executed="True" result="Success" success="True" time="0.287" asserts="0" />
+                  <test-case name="Test_Pool_ThreadSafety_AcquireReleaseConcurrent" executed="True" result="Success" success="True" time="1.577" asserts="0" />
+                  <test-case name="Test_Pool_Stats_InitialState" executed="True" result="Success" success="True" time="0.011" asserts="0" />
+                  <test-case name="Test_Pool_Stats_AfterAcquire" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                  <test-case name="Test_Pool_Stats_CountersUpdate" executed="True" result="Success" success="True" time="0.040" asserts="0" />
+                  <test-case name="Test_PoolHelper_ExecuteFunction" executed="True" result="Success" success="True" time="0.024" asserts="0" />
+                  <test-case name="Test_PoolHelper_ExecuteProcedure" executed="True" result="Success" success="True" time="0.020" asserts="0" />
+                  <test-case name="Test_PoolHelper_ExceptionHandling" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                  <test-case name="Test_PooledClient_AutoRelease" executed="True" result="Success" success="True" time="0.015" asserts="0" />
+                  <test-case name="Test_PooledClient_ManualRelease" executed="True" result="Success" success="True" time="0.049" asserts="0" />
+                  <test-case name="Test_Pool_Shutdown_ClosesAllConnections" executed="True" result="Success" success="True" time="0.060" asserts="0" />
+                  <test-case name="Test_Pool_Shutdown_AlreadyShutdown" executed="True" result="Success" success="True" time="0.046" asserts="0" />
+                </results>
+              </test-suite>
+              <test-suite type="Fixture" name="TRedisPubSubTests" executed="True" result="Failure" success="False" time="53.535" >
+                <results>
+                  <test-case name="Test_Publisher_Connect" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                  <test-case name="Test_Publisher_Publish_NoSubscribers" executed="True" result="Success" success="True" time="0.016" asserts="0" />
+                  <test-case name="Test_Publisher_Publish_WithSubscribers" executed="True" result="Error" success="False" time="0.715" asserts="0" >
+                    <failure>
+                      <message>
+                        <![CDATA[ Errore lettura risposta: Errore lettura risposta: Connection timed out ]]>
+                      </message>
+                      <stack-trace>
+                        <![CDATA[  ]]>
+                      </stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case name="Test_Publisher_PubSubChannels" executed="True" result="Success" success="True" time="5.042" asserts="0" />
+                  <test-case name="Test_Publisher_PubSubNumSub" executed="True" result="Success" success="True" time="5.043" asserts="0" />
+                  <test-case name="Test_Publisher_PubSubNumPat" executed="True" result="Success" success="True" time="5.038" asserts="0" />
+                  <test-case name="Test_Subscriber_Connect" executed="True" result="Success" success="True" time="0.013" asserts="0" />
+                  <test-case name="Test_Subscriber_Subscribe_SingleChannel" executed="True" result="Failure" success="False" time="0.718" asserts="0" >
+                    <failure>
+                      <message>
+                        <![CDATA[ Expected [1] but got [2] Dovrebbe ricevere 1 messaggio ]]>
+                      </message>
+                      <stack-trace>
+                        <![CDATA[  ]]>
+                      </stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case name="Test_Subscriber_Subscribe_MultipleChannels" executed="True" result="Error" success="False" time="0.830" asserts="0" >
+                    <failure>
+                      <message>
+                        <![CDATA[ Risposta vuota dal server ]]>
+                      </message>
+                      <stack-trace>
+                        <![CDATA[  ]]>
+                      </stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case name="Test_Subscriber_Unsubscribe" executed="True" result="Success" success="True" time="5.350" asserts="0" />
+                  <test-case name="Test_Subscriber_PSubscribe_Pattern" executed="True" result="Error" success="False" time="0.842" asserts="0" >
+                    <failure>
+                      <message>
+                        <![CDATA[ Formato messaggio Pub/Sub non valido ]]>
+                      </message>
+                      <stack-trace>
+                        <![CDATA[  ]]>
+                      </stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case name="Test_Subscriber_PUnsubscribe" executed="True" result="Success" success="True" time="5.375" asserts="0" />
+                  <test-case name="Test_Messaging_PublishReceive" executed="True" result="Failure" success="False" time="0.750" asserts="0" >
+                    <failure>
+                      <message>
+                        <![CDATA[ Expected [1] but got [2] ]]>
+                      </message>
+                      <stack-trace>
+                        <![CDATA[  ]]>
+                      </stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case name="Test_Messaging_MultipleMessages" executed="True" result="Failure" success="False" time="1.191" asserts="0" >
+                    <failure>
+                      <message>
+                        <![CDATA[ Expected [10] but got [11] Dovrebbe ricevere 10 messaggi ]]>
+                      </message>
+                      <stack-trace>
+                        <![CDATA[  ]]>
+                      </stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case name="Test_Messaging_PatternMatching" executed="True" result="Failure" success="False" time="0.843" asserts="0" >
+                    <failure>
+                      <message>
+                        <![CDATA[ Expected [3] but got [4] ]]>
+                      </message>
+                      <stack-trace>
+                        <![CDATA[  ]]>
+                      </stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case name="Test_Messaging_MultipleSubscribers" executed="True" result="Error" success="False" time="0.859" asserts="0" >
+                    <failure>
+                      <message>
+                        <![CDATA[ Errore lettura risposta: Errore lettura risposta: Connection timed out ]]>
+                      </message>
+                      <stack-trace>
+                        <![CDATA[  ]]>
+                      </stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case name="Test_Listener_StartStop" executed="True" result="Success" success="True" time="5.030" asserts="0" />
+                  <test-case name="Test_Listener_ReceiveInBackground" executed="True" result="Failure" success="False" time="5.556" asserts="0" >
+                    <failure>
+                      <message>
+                        <![CDATA[ Expected [1] but got [2] Dovrebbe ricevere messaggio in background ]]>
+                      </message>
+                      <stack-trace>
+                        <![CDATA[  ]]>
+                      </stack-trace>
+                    </failure>
+                  </test-case>
+                  <test-case name="Test_Validation_EmptyChannel" executed="True" result="Success" success="True" time="0.005" asserts="0" />
+                  <test-case name="Test_Validation_EmptyPattern" executed="True" result="Success" success="True" time="0.008" asserts="0" />
+                </results>
+              </test-suite>
+          </results>
+        </test-suite>
+    </results>
+  </test-suite>
+</test-results>

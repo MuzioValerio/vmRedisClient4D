@@ -1,0 +1,72 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{2A8D0499-A826-4B69-845D-00E1F6256296}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="ExampleConsole.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="ExamplePubSub.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="ExamplePooling.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="ExampleHealthCheck.dproj">
+            <Dependencies/>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="ExampleConsole">
+        <MSBuild Projects="ExampleConsole.dproj"/>
+    </Target>
+    <Target Name="ExampleConsole:Clean">
+        <MSBuild Projects="ExampleConsole.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ExampleConsole:Make">
+        <MSBuild Projects="ExampleConsole.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ExamplePubSub">
+        <MSBuild Projects="ExamplePubSub.dproj"/>
+    </Target>
+    <Target Name="ExamplePubSub:Clean">
+        <MSBuild Projects="ExamplePubSub.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ExamplePubSub:Make">
+        <MSBuild Projects="ExamplePubSub.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ExamplePooling">
+        <MSBuild Projects="ExamplePooling.dproj"/>
+    </Target>
+    <Target Name="ExamplePooling:Clean">
+        <MSBuild Projects="ExamplePooling.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ExamplePooling:Make">
+        <MSBuild Projects="ExamplePooling.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="ExampleHealthCheck">
+        <MSBuild Projects="ExampleHealthCheck.dproj"/>
+    </Target>
+    <Target Name="ExampleHealthCheck:Clean">
+        <MSBuild Projects="ExampleHealthCheck.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ExampleHealthCheck:Make">
+        <MSBuild Projects="ExampleHealthCheck.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="ExampleConsole;ExamplePubSub;ExamplePooling;ExampleHealthCheck"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="ExampleConsole:Clean;ExamplePubSub:Clean;ExamplePooling:Clean;ExampleHealthCheck:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="ExampleConsole:Make;ExamplePubSub:Make;ExamplePooling:Make;ExampleHealthCheck:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>
