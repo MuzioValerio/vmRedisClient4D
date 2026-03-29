@@ -1,10 +1,22 @@
-{-----------------------------------------------------------------------------
+﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Copyright (C) 2025 Muzio Valerio
-
  Unit Name: Redis.HealthCheck
- Author:    VMuzio
+ Copyright (C) 2025-2026 Muzio Valerio
+ Author:    Muzio Valerio
  Date:      14-dic-2025
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+
  Updated:   2026 - Fix: New deve essere class function, non instance method
                         LogDebug usa livello corretto
 -----------------------------------------------------------------------------}
@@ -18,9 +30,9 @@ uses
   Redis.Types;
 
 type
-  /// Logger semplice su console + file di testo.
-  /// Da usare in sviluppo/test. In produzione sostituire con
-  /// un logger più robusto (es. Log4D, MEL wrapper, ecc.)
+  // Logger semplice su console + file di testo.
+  // Da usare in sviluppo/test. In produzione sostituire con
+  // un logger più robusto
   TSimpleRedisLogger = class(TInterfacedObject, IRedisLogger)
   strict private
     FLogFile: string;
@@ -34,7 +46,6 @@ type
     procedure LogDebug(const aInfo: string);
     constructor Create(const aLogFile: string = ''); reintroduce;
   public
-    // FIX: New deve essere class function per poter creare l'istanza
     class function New(const aLogFile: string = ''): IRedisLogger;
   end;
 

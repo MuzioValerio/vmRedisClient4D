@@ -1,0 +1,1792 @@
+﻿{-----------------------------------------------------------------------------
+ Project: vmRedisClient
+ Unit Name: Redis.Client
+ Copyright (C) 2025-2026 Muzio Valerio
+ Author:    Muzio Valerio
+ Date:      14-dic-2025
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+
+ Updated:   2026 - Aggiornamento completo per Redis 8.x
+
+ Bug fix:
+   1. ZRange: WITHSCORES invece di 'aWithScores'
+   2. Scan/SScan/HScan/ZScan: restituisce TRedisScanResult con cursore
+   3. CRLF: usa RESP_CRLF (#13#10) - delegato al serializzatore
+   4. IncrByFloat/HIncrByFloat: locale invariante per double
+
+ Nuovi comandi:
+   Stringhe: MGet, MSet, MSetNX, GetSet, IncrByFloat, SetRange, GetRange, PSetEx
+   Chiavi:   Persist, PExpire, PExpireAt, ExpireAt, ExpireTime, PExpireTime,
+             PTTL, KeyType, Rename, RenameNX, RandomKey, Copy, Unlink
+   Liste:    LSet, LInsert, LRem, LTrim, LMove, LPushX, RPushX
+   Set:      SMIsMember, SPop, SRandMember, SMove, SUnion/Store,
+             SInter/Store, SDiff/Store
+   Hash:     HMGet, HMSet, HIncrBy, HIncrByFloat, HRandField
+   ZSet:     ZAddOpt, ZIncrBy, ZCount, ZRank, ZRevRank, ZRevRange,
+             ZRangeByScore, ZRevRangeByScore, ZPopMin, ZPopMax, ZRandMember
+   HyperLogLog: PFAdd, PFCount, PFMerge
+   Trans:    Watch, Unwatch
+   Pipeline: BeginPipeline, PipelineCommand, ExecPipeline
+   Lua:      Eval, EvalSha, ScriptLoad
+   Server:   DbSize, FlushDb, Info, Select, ClientSetName, ClientGetName,
+             ConfigGet, ConfigSet
+-----------------------------------------------------------------------------}
+
+unit Redis.Client;
+
+interface
+
+uses
+  System.Classes, System.SysUtils, System.Generics.Collections,
+  Redis.Client.Intf,
+  Redis.Types,
+  Redis.Response,
+  Redis.Protocol,
+  Redis.Transport.Synapse,
+  Redis.PubSub,
+  Redis.Connection.Config;
+
+type
+  TRedisClient = class(TInterfacedObject, IRedisClient)
+  strict private
+    FTransport: IRedisSynapseTransport;
+    FParser: TRedisProtocolParser;
+    FConfig: TRedisConnectionConfig;
+    FInTransaction: Boolean;
+    FLogger: IRedisLogger;
+    FPipelineActive: Boolean;
+    FPipelineCmdCount: Integer;
+
+    // Helpers interni
+    function  ExecuteAndParse(const aParts: array of string): IRedisResponse;
+    procedure CheckConnection;
+    procedure ValidateKey(const aKey: string);
+    procedure ValidateKeys(const aKeys: array of string);
+    function ResponseToStringArray(aResponse: IRedisResponse): TArray<string>;
+    function BuildCommandArray(const aCmd, aKey: string; const aValues: array of string): TList<string>;
+    function FloatToRedis(aValue: Double): string;
+    function RedisToFloat(const aStr: string): Double;
+    // Costruisce un TRedisScanResult da una risposta SCAN/SSCAN/HSCAN/ZSCAN
+    function ParseScanResponse(aResponse: IRedisResponse): TRedisScanResult;
+  private
+    // Connessione
+    procedure Connect;
+    procedure Disconnect;
+    function IsConnected: Boolean;
+    function Ping: Boolean;
+    function HealthCheckDetailed: TRedisHealthInfo;
+    procedure LogHealthStatus;
+
+    // Chiavi generiche
+    function Get(const aKey: string): IRedisResponse;
+    function SetValue(const aKey, aValue: string): Boolean;
+    function SetEx(const aKey, aValue: string; aSeconds: Integer): Boolean;
+    function PSetEx(const aKey, aValue: string; aMilliseconds: Int64): Boolean;
+    function SetNX(const aKey, aValue: string): Boolean;
+    function GetEx(const aKey: string; aSeconds: Integer): IRedisResponse;
+    function GetExPersist(const aKey: string): IRedisResponse;
+    function GetDel(const aKey: string): IRedisResponse;
+    function GetSet(const aKey, aValue: string): IRedisResponse;
+    function MGet(const aKeys: array of string): TArray<string>;
+    function MSet(const aPairs: array of string): Boolean;
+    function MSetNX(const aPairs: array of string): Boolean;
+    function Del(const aKeys: array of string): Integer;
+    function Unlink(const aKeys: array of string): Integer;
+    function Exists(const aKeys: array of string): Integer;
+    function Expire(const aKey: string; aSeconds: Integer): Boolean;
+    function PExpire(const aKey: string; aMilliseconds: Int64): Boolean;
+    function ExpireAt(const aKey: string; aUnixTimestamp: Int64): Boolean;
+    function PExpireAt(const aKey: string; aUnixTimestampMs: Int64): Boolean;
+    function Persist(const aKey: string): Boolean;
+    function TTL(const aKey: string): Integer;
+    function PTTL(const aKey: string): Int64;
+    function ExpireTime(const aKey: string): Int64;
+    function PExpireTime(const aKey: string): Int64;
+    function KeyType(const aKey: string): string;
+    function Rename(const aKey, aNewKey: string): Boolean;
+    function RenameNX(const aKey, aNewKey: string): Boolean;
+    function RandomKey: string;
+    function Copy(const aSrcKey, aDstKey: string; aReplace: Boolean = False): Boolean;
+    function Keys(const aPattern: string): TArray<string>;
+    function Scan(aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TRedisScanResult;
+
+    // Stringhe
+    function Append(const aKey, aValue: string): Integer;
+    function Incr(const aKey: string): Int64;
+    function IncrBy(const aKey: string; aIncrement: Int64): Int64;
+    function IncrByFloat(const aKey: string; aIncrement: Double): Double;
+    function Decr(const aKey: string): Int64;
+    function DecrBy(const aKey: string; aDecrement: Int64): Int64;
+    function StrLen(const aKey: string): Integer;
+    function SetRange(const aKey: string; aOffset: Integer; const aValue: string): Integer;
+    function GetRange(const aKey: string; aStart, aEnd: Integer): string;
+
+    // Liste
+    function LPush(const aKey: string; const aValues: array of string): Integer;
+    function RPush(const aKey: string; const aValues: array of string): Integer;
+    function LPushX(const aKey: string; const aValues: array of string): Integer;
+    function RPushX(const aKey: string; const aValues: array of string): Integer;
+    function LPop(const aKey: string): IRedisResponse;
+    function RPop(const aKey: string): IRedisResponse;
+    function LLen(const aKey: string): Integer;
+    function LRange(const aKey: string; aStart, aStop: Integer): TArray<string>;
+    function LIndex(const aKey: string; aIndex: Integer): IRedisResponse;
+    function LSet(const aKey: string; aIndex: Integer; const aValue: string): Boolean;
+    function LInsert(const aKey: string; aBefore: Boolean; const aPivot, aValue: string): Integer;
+    function LRem(const aKey: string; aCount: Integer; const aValue: string): Integer;
+    function LTrim(const aKey: string; aStart, aStop: Integer): Boolean;
+    function LMove(const aSrc, aDst: string; aSrcLeft, aDstLeft: Boolean): IRedisResponse;
+
+    // Set
+    function SAdd(const aKey: string; const aMembers: array of string): Integer;
+    function SRem(const aKey: string; const aMembers: array of string): Integer;
+    function SMembers(const aKey: string): TArray<string>;
+    function SIsMember(const aKey, aMember: string): Boolean;
+    function SMIsMember(const aKey: string; const aMembers: array of string): TArray<Boolean>;
+    function SCard(const aKey: string): Integer;
+    function SPop(const aKey: string; aCount: Integer = 1): TArray<string>;
+    function SRandMember(const aKey: string; aCount: Integer = 1): TArray<string>;
+    function SMove(const aSrc, aDst, aMember: string): Boolean;
+    function SUnion(const aKeys: array of string): TArray<string>;
+    function SUnionStore(const aDst: string; const aKeys: array of string): Integer;
+    function SInter(const aKeys: array of string): TArray<string>;
+    function SInterStore(const aDst: string; const aKeys: array of string): Integer;
+    function SDiff(const aKeys: array of string): TArray<string>;
+    function SDiffStore(const aDst: string; const aKeys: array of string): Integer;
+    function SScan(const aKey: string; aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TRedisScanResult;
+
+    // Hash
+    function HSet(const aKey, aField, aValue: string): Boolean;
+    function HGet(const aKey, aField: string): IRedisResponse;
+    function HGetAll(const aKey: string): TArray<string>;
+    function HMGet(const aKey: string; const aFields: array of string): TArray<string>;
+    function HMSet(const aKey: string; const aPairs: array of string): Boolean;
+    function HDel(const aKey: string; const aFields: array of string): Integer;
+    function HExists(const aKey, aField: string): Boolean;
+    function HKeys(const aKey: string): TArray<string>;
+    function HVals(const aKey: string): TArray<string>;
+    function HLen(const aKey: string): Integer;
+    function HIncrBy(const aKey, aField: string; aIncrement: Int64): Int64;
+    function HIncrByFloat(const aKey, aField: string; aIncrement: Double): Double;
+    function HRandField(const aKey: string; aCount: Integer = 1): TArray<string>;
+    function HScan(const aKey: string; aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TRedisScanResult;
+
+    // Sorted Set
+    function ZAdd(const aKey: string; aScore: Double; const aMember: string): Boolean;
+    function ZAddOpt(const aKey: string; aScore: Double; const aMember: string; aOption: TRedisZAddOption; aCH: Boolean = False): Integer;
+    function ZRem(const aKey: string; const aMembers: array of string): Integer;
+    function ZScore(const aKey, aMember: string): Double;
+    function ZIncrBy(const aKey: string; aIncrement: Double; const aMember: string): Double;
+    function ZCard(const aKey: string): Integer;
+    function ZCount(const aKey, aMin, aMax: string): Integer;
+    function ZRank(const aKey, aMember: string): Integer;
+    function ZRevRank(const aKey, aMember: string): Integer;
+    function ZRange(const aKey: string; aStart, aStop: Integer; aWithScores: Boolean = False): TArray<string>;
+    function ZRevRange(const aKey: string; aStart, aStop: Integer; aWithScores: Boolean = False): TArray<string>;
+    function ZRangeByScore(const aKey, aMin, aMax: string; aWithScores: Boolean = False; aOffset: Integer = 0; aCount: Integer = -1): TArray<string>;
+    function ZRevRangeByScore(const aKey, aMax, aMin: string; aWithScores: Boolean = False; aOffset: Integer = 0; aCount: Integer = -1): TArray<string>;
+    function ZPopMin(const aKey: string; aCount: Integer = 1): TArray<string>;
+    function ZPopMax(const aKey: string; aCount: Integer = 1): TArray<string>;
+    function ZRandMember(const aKey: string; aCount: Integer = 1): TArray<string>;
+    function ZScan(const aKey: string; aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TRedisScanResult;
+
+    // HyperLogLog
+    function PFAdd(const aKey: string; const aElements: array of string): Boolean;
+    function PFCount(const aKeys: array of string): Int64;
+    function PFMerge(const aDstKey: string; const aSrcKeys: array of string): Boolean;
+
+    // Transazioni
+    procedure Watch(const aKeys: array of string);
+    procedure Unwatch;
+    procedure Multi;
+    function Exec: IRedisResponse;
+    procedure Discard;
+
+    // Pipeline
+    procedure BeginPipeline;
+    procedure PipelineCommand(const aParts: array of string);
+    function ExecPipeline: TArray<IRedisResponse>;
+
+    // Lua Scripting
+    function Eval(const aScript: string; const aKeys: array of string; const aArgs: array of string): IRedisResponse;
+    function EvalSha(const aSha: string; const aKeys: array of string; const aArgs: array of string): IRedisResponse;
+    function ScriptLoad(const aScript: string): string;
+
+    // Server
+    function DbSize: Int64;
+    function FlushDb(aAsync: Boolean = False): Boolean;
+    function Info(const aSection: string = ''): string;
+    function Select(aDb: Integer): Boolean;
+    function ClientSetName(const aName: string): Boolean;
+    function ClientGetName: string;
+    function ConfigGet(const aParameter: string): TArray<string>;
+    function ConfigSet(const aName, aValue: string): Boolean;
+
+    // Pub/Sub
+    function CreatePublisher: IRedisPubSubPublisher;
+    function CreateSubscriber: IRedisPubSubClient;
+    function Publish(const aChannel, aMessage: string): Integer;
+
+    // Generico
+    function ExecuteCommand(const aParts: array of string): IRedisResponse;
+
+    constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil); reintroduce;
+  public
+    destructor Destroy; override;
+    class function New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil): IRedisClient;
+  end;
+
+implementation
+
+uses
+  System.Math, System.DateUtils;
+
+{ TRedisClient }
+
+// Nuova versione per utilizzo dei native trasport
+class function TRedisClient.New(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger = nil; const aProvider: string = 'synapse'): IRedisClient;
+begin
+  Result := TRedisClient.Create(
+    aConfig, 
+    TRedisTransportRegistry.Acquire(aProvider, aConfig, aLogger), 
+    aLogger // Il client usa lo stesso logger del trasporto
+  );
+end;
+
+{class function TRedisClient.New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger): IRedisClient;
+begin
+  Result := TRedisClient.Create(aConfig, aLogger);   
+end;
+}
+
+constructor TRedisClient.Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger);
+begin
+  inherited Create;
+  FConfig := aConfig;
+  FLogger := aLogger;
+  FTransport := TRedisSynapseTransport.New(aConfig, aLogger);
+  FParser := TRedisProtocolParser.Create(FTransport);
+  FInTransaction := False;
+  FPipelineActive := False;
+  FPipelineCmdCount := 0;
+end;
+
+destructor TRedisClient.Destroy;
+begin
+  Disconnect;
+  FreeAndNil(FParser);
+  inherited Destroy;
+end;
+
+// ---------------------------------------------------------------------------
+// Helpers privati
+// ---------------------------------------------------------------------------
+
+function TRedisClient.FloatToRedis(aValue: Double): string;
+begin
+  var lFS := TFormatSettings.Create('en-US');
+  Result := FloatToStr(aValue, lFS);
+end;
+
+function TRedisClient.RedisToFloat(const aStr: string): Double;
+begin
+  var lFS := TFormatSettings.Create('en-US');
+  Result := StrToFloatDef(aStr, 0.0, lFS);
+end;
+
+function TRedisClient.ParseScanResponse(aResponse: IRedisResponse): TRedisScanResult;
+begin
+  var lItems := aResponse.AsArray;
+  if Length(lItems) >= 2 then
+  begin
+    Result.Cursor := StrToInt64Def(lItems[0].AsString, 0);
+    Result.Items := ResponseToStringArray(lItems[1]);
+  end
+  else
+  begin
+    Result.Cursor := 0;
+    SetLength(Result.Items, 0);
+  end;
+end;
+
+function TRedisClient.BuildCommandArray(const aCmd, aKey: string; const aValues: array of string): TList<string>;
+begin
+  Result := TList<string>.Create;
+  Result.Add(aCmd);
+  Result.Add(aKey);
+  for var I := 0 to High(aValues) do
+    Result.Add(aValues[I]);
+end;
+
+function TRedisClient.ResponseToStringArray(aResponse: IRedisResponse): TArray<string>;
+begin
+  if aResponse.IsNull then
+  begin
+    SetLength(Result, 0);
+    Exit;
+  end;
+  var lItems := aResponse.AsArray;
+  SetLength(Result, Length(lItems));
+  for var I := 0 to High(lItems) do
+    Result[I] := lItems[I].AsString;
+end;
+
+procedure TRedisClient.CheckConnection;
+begin
+  if not IsConnected then
+    raise ERedisConnectionException.Create('Client non connesso al server Redis');
+end;
+
+procedure TRedisClient.ValidateKey(const aKey: string);
+begin
+  if aKey.Trim.IsEmpty then
+    raise ERedisValidationException.Create('La chiave non può essere vuota');
+end;
+
+procedure TRedisClient.ValidateKeys(const aKeys: array of string);
+begin
+  if Length(aKeys) = 0 then
+    raise ERedisValidationException.Create('Deve essere specificata almeno una chiave');
+  for var I := 0 to High(aKeys) do
+    ValidateKey(aKeys[I]);
+end;
+
+function TRedisClient.ExecuteAndParse(const aParts: array of string): IRedisResponse;
+begin
+  CheckConnection;
+  FTransport.SendCommand(aParts);
+  Result := FParser.Parse;
+  if Result.IsError then
+    raise ERedisCommandException.Create(Result.GetErrorMessage);
+end;
+
+// ---------------------------------------------------------------------------
+// Connessione
+// ---------------------------------------------------------------------------
+
+procedure TRedisClient.Connect;
+begin
+  FTransport.Connect;
+end;
+
+procedure TRedisClient.Disconnect;
+begin
+  try
+    FTransport.Disconnect;
+  finally
+    FInTransaction := False;
+    FPipelineActive := False;
+    FPipelineCmdCount := 0;
+  end;
+end;
+
+function TRedisClient.IsConnected: Boolean;
+begin
+  Result := FTransport.IsConnected;
+end;
+
+function TRedisClient.Ping: Boolean;
+begin
+  try
+    var lResponse := ExecuteAndParse(['PING']);
+    Result := lResponse.AsString = 'PONG';
+  except
+    Result := False;
+  end;
+end;
+
+// ---------------------------------------------------------------------------
+// HealthCheck
+// ---------------------------------------------------------------------------
+
+function TRedisClient.HealthCheckDetailed: TRedisHealthInfo;
+begin
+  Result.CheckTimestamp := Now;
+  Result.IsHealthy := False;
+  Result.PingSuccess := False;
+  Result.PingResponseTimeMs := -1;
+  Result.CanExecuteCommands := False;
+  Result.TransportConnected := False;
+  Result.ErrorMessage := '';
+
+  if not IsConnected then
+  begin
+    Result.ErrorMessage := 'Client non connesso';
+    Exit;
+  end;
+
+  Result.TransportConnected := FTransport.IsConnected;
+  if not Result.TransportConnected then
+  begin
+    Result.ErrorMessage := 'Transport non connesso';
+    Exit;
+  end;
+
+  try
+    var lStart := Now;
+    Result.PingSuccess := Ping;
+    Result.PingResponseTimeMs := MilliSecondsBetween(Now, lStart);
+    if not Result.PingSuccess then
+    begin
+      Result.ErrorMessage := 'PING fallito';
+      Exit;
+    end;
+  except
+    on E: Exception do
+    begin
+      Result.ErrorMessage := 'PING exception: ' + E.Message;
+      Exit;
+    end;
+  end;
+
+  try
+    Get('__healthcheck__');
+    Result.CanExecuteCommands := True;
+  except
+    on E: Exception do
+    begin
+      Result.ErrorMessage := 'Impossibile eseguire comandi: ' + E.Message;
+      Exit;
+    end;
+  end;
+
+  Result.IsHealthy := True;
+  Result.ErrorMessage := 'OK';
+end;
+
+procedure TRedisClient.LogHealthStatus;
+begin
+  if not Assigned(FLogger) then
+    Exit;
+  var lH := HealthCheckDetailed;
+  FLogger.LogInfo('=== Redis Health Check ===');
+  FLogger.LogInfo(lH.ToString);
+  FLogger.LogInfo('==========================');
+end;
+
+// ===========================================================================
+// CHIAVI GENERICHE
+// ===========================================================================
+
+function TRedisClient.Get(const aKey: string): IRedisResponse;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['GET', aKey]);
+end;
+
+function TRedisClient.SetValue(const aKey, aValue: string): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['SET', aKey, aValue]).AsString = 'OK';
+end;
+
+function TRedisClient.SetEx(const aKey, aValue: string; aSeconds: Integer): Boolean;
+begin
+  ValidateKey(aKey);
+  if aSeconds <= 0 then
+    raise ERedisValidationException.Create('I secondi devono essere > 0');
+  Result := ExecuteAndParse(['SETEX', aKey, IntToStr(aSeconds), aValue]).AsString = 'OK';
+end;
+
+function TRedisClient.PSetEx(const aKey, aValue: string; aMilliseconds: Int64): Boolean;
+begin
+  ValidateKey(aKey);
+  if aMilliseconds <= 0 then
+    raise ERedisValidationException.Create('I millisecondi devono essere > 0');
+  Result := ExecuteAndParse(['PSETEX', aKey, IntToStr(aMilliseconds), aValue]).AsString = 'OK';
+end;
+
+function TRedisClient.SetNX(const aKey, aValue: string): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['SETNX', aKey, aValue]).AsInteger = 1;
+end;
+
+function TRedisClient.GetEx(const aKey: string; aSeconds: Integer): IRedisResponse;
+begin
+  ValidateKey(aKey);
+  if aSeconds <= 0 then
+    raise ERedisValidationException.Create('I secondi devono essere > 0');
+  Result := ExecuteAndParse(['GETEX', aKey, 'EX', IntToStr(aSeconds)]);
+end;
+
+function TRedisClient.GetExPersist(const aKey: string): IRedisResponse;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['GETEX', aKey, 'PERSIST']);
+end;
+
+function TRedisClient.GetDel(const aKey: string): IRedisResponse;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['GETDEL', aKey]);
+end;
+
+function TRedisClient.GetSet(const aKey, aValue: string): IRedisResponse;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['GETSET', aKey, aValue]);
+end;
+
+function TRedisClient.MGet(const aKeys: array of string): TArray<string>;
+  function SliceSubArray(const aOrigine: array of string): TArray<string>;
+  begin
+    SetLength(Result, Length(aOrigine)-1);
+    for var I := 0 to High(Result) do
+       Result[I] := aOrigine[I + 1];
+  end;
+begin
+  ValidateKeys(aKeys);
+  var lCmd := BuildCommandArray('MGET', aKeys[0], SliceSubArray(aKeys));
+  try
+    // Ricostruiamo manualmente perché MGET non ha key centrale
+    var lCmd2 := TList<string>.Create;
+    try
+      lCmd2.Add('MGET');
+      for var K in aKeys do 
+	    lCmd2.Add(K);
+      Result := ResponseToStringArray(ExecuteAndParse(lCmd2.ToArray));
+    finally
+      lCmd2.Free;
+    end;
+  finally
+    lCmd.Free;
+  end;
+end;
+
+function TRedisClient.MSet(const aPairs: array of string): Boolean;
+begin
+  if Length(aPairs) = 0 then
+    raise ERedisValidationException.Create('Specificare almeno una coppia chiave/valore');
+  if (Length(aPairs) mod 2) <> 0 then
+    raise ERedisValidationException.Create('Le coppie chiave/valore devono essere in numero pari');
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('MSET');
+    for var S in aPairs do 
+	  lCmd.Add(S);
+    Result := ExecuteAndParse(lCmd.ToArray).AsString = 'OK';
+  finally
+    lCmd.Free;
+  end;
+end;
+
+function TRedisClient.MSetNX(const aPairs: array of string): Boolean;
+begin
+  if (Length(aPairs) = 0) or ((Length(aPairs) mod 2) <> 0) then
+    raise ERedisValidationException.Create('Le coppie chiave/valore devono essere in numero pari');
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('MSETNX');
+    for var S in aPairs do 
+	  lCmd.Add(S);
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger = 1;
+  finally
+    lCmd.Free;
+  end;
+end;
+
+function TRedisClient.Del(const aKeys: array of string): Integer;
+begin
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('DEL');
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
+  finally
+    lCmd.Free;
+  end;
+end;
+
+function TRedisClient.Unlink(const aKeys: array of string): Integer;
+begin
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('UNLINK');
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
+  finally
+    lCmd.Free;
+  end;
+end;
+
+function TRedisClient.Exists(const aKeys: array of string): Integer;
+begin
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('EXISTS');
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
+  finally
+    lCmd.Free;
+  end;
+end;
+
+function TRedisClient.Expire(const aKey: string; aSeconds: Integer): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['EXPIRE', aKey, IntToStr(aSeconds)]).AsInteger = 1;
+end;
+
+function TRedisClient.PExpire(const aKey: string; aMilliseconds: Int64): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['PEXPIRE', aKey, IntToStr(aMilliseconds)]).AsInteger = 1;
+end;
+
+function TRedisClient.ExpireAt(const aKey: string; aUnixTimestamp: Int64): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['EXPIREAT', aKey, IntToStr(aUnixTimestamp)]).AsInteger = 1;
+end;
+
+function TRedisClient.PExpireAt(const aKey: string; aUnixTimestampMs: Int64): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['PEXPIREAT', aKey, IntToStr(aUnixTimestampMs)]).AsInteger = 1;
+end;
+
+function TRedisClient.Persist(const aKey: string): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['PERSIST', aKey]).AsInteger = 1;
+end;
+
+function TRedisClient.TTL(const aKey: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['TTL', aKey]).AsInteger;
+end;
+
+function TRedisClient.PTTL(const aKey: string): Int64;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['PTTL', aKey]).AsInteger;
+end;
+
+function TRedisClient.ExpireTime(const aKey: string): Int64;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['EXPIRETIME', aKey]).AsInteger;
+end;
+
+function TRedisClient.PExpireTime(const aKey: string): Int64;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['PEXPIRETIME', aKey]).AsInteger;
+end;
+
+function TRedisClient.KeyType(const aKey: string): string;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['TYPE', aKey]).AsString;
+end;
+
+function TRedisClient.Rename(const aKey, aNewKey: string): Boolean;
+begin
+  ValidateKey(aKey);
+  ValidateKey(aNewKey);
+  Result := ExecuteAndParse(['RENAME', aKey, aNewKey]).AsString = 'OK';
+end;
+
+function TRedisClient.RenameNX(const aKey, aNewKey: string): Boolean;
+begin
+  ValidateKey(aKey);
+  ValidateKey(aNewKey);
+  Result := ExecuteAndParse(['RENAMENX', aKey, aNewKey]).AsInteger = 1;
+end;
+
+function TRedisClient.RandomKey: string;
+begin
+  var lResp := ExecuteAndParse(['RANDOMKEY']);
+  if lResp.IsNull then
+    Result := ''
+  else
+    Result := lResp.AsString;
+end;
+
+function TRedisClient.Copy(const aSrcKey, aDstKey: string; aReplace: Boolean): Boolean;
+begin
+  ValidateKey(aSrcKey);
+  ValidateKey(aDstKey);
+  if aReplace then
+    Result := ExecuteAndParse(['COPY', aSrcKey, aDstKey, 'REPLACE']).AsInteger = 1
+  else
+    Result := ExecuteAndParse(['COPY', aSrcKey, aDstKey]).AsInteger = 1;
+end;
+
+function TRedisClient.Keys(const aPattern: string): TArray<string>;
+begin
+  if aPattern = '' then
+    raise ERedisValidationException.Create('Il pattern non può essere vuoto');
+  if Assigned(FLogger) then
+    FLogger.LogWarning('KEYS è bloccante in produzione. Preferire SCAN.');
+  Result := ResponseToStringArray(ExecuteAndParse(['KEYS', aPattern]));
+end;
+
+function TRedisClient.Scan(aCursor: Int64; const aPattern: string; aCount: Integer): TRedisScanResult;
+begin
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('SCAN');
+    lCmd.Add(IntToStr(aCursor));
+    if aPattern <> '' then 
+	begin 
+	  lCmd.Add('MATCH'); 
+	  lCmd.Add(aPattern); 
+	end;
+    if aCount > 0 then   
+	begin 
+	  lCmd.Add('COUNT'); 
+	  lCmd.Add(IntToStr(aCount)); 
+	end;
+    Result := ParseScanResponse(ExecuteAndParse(lCmd.ToArray));
+  finally
+    lCmd.Free;
+  end;
+end;
+
+// ===========================================================================
+// STRINGHE
+// ===========================================================================
+
+function TRedisClient.Append(const aKey, aValue: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['APPEND', aKey, aValue]).AsInteger;
+end;
+
+function TRedisClient.Incr(const aKey: string): Int64;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['INCR', aKey]).AsInteger;
+end;
+
+function TRedisClient.IncrBy(const aKey: string; aIncrement: Int64): Int64;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['INCRBY', aKey, IntToStr(aIncrement)]).AsInteger;
+end;
+
+function TRedisClient.IncrByFloat(const aKey: string; aIncrement: Double): Double;
+begin
+  ValidateKey(aKey);
+  var lResp := ExecuteAndParse(['INCRBYFLOAT', aKey, FloatToRedis(aIncrement)]);
+  Result := RedisToFloat(lResp.AsString);
+end;
+
+function TRedisClient.Decr(const aKey: string): Int64;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['DECR', aKey]).AsInteger;
+end;
+
+function TRedisClient.DecrBy(const aKey: string; aDecrement: Int64): Int64;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['DECRBY', aKey, IntToStr(aDecrement)]).AsInteger;
+end;
+
+function TRedisClient.StrLen(const aKey: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['STRLEN', aKey]).AsInteger;
+end;
+
+function TRedisClient.SetRange(const aKey: string; aOffset: Integer; const aValue: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['SETRANGE', aKey, IntToStr(aOffset), aValue]).AsInteger;
+end;
+
+function TRedisClient.GetRange(const aKey: string; aStart, aEnd: Integer): string;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['GETRANGE', aKey, IntToStr(aStart), IntToStr(aEnd)]).AsString;
+end;
+
+// ===========================================================================
+// LISTE
+// ===========================================================================
+
+function TRedisClient.LPush(const aKey: string; const aValues: array of string): Integer;
+begin
+  ValidateKey(aKey);
+  var lCmd := BuildCommandArray('LPUSH', aKey, aValues);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.RPush(const aKey: string; const aValues: array of string): Integer;
+begin
+  ValidateKey(aKey);
+  var lCmd := BuildCommandArray('RPUSH', aKey, aValues);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.LPushX(const aKey: string; const aValues: array of string): Integer;
+begin
+  ValidateKey(aKey);
+  var lCmd := BuildCommandArray('LPUSHX', aKey, aValues);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.RPushX(const aKey: string; const aValues: array of string): Integer;
+begin
+  ValidateKey(aKey);
+  var lCmd := BuildCommandArray('RPUSHX', aKey, aValues);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.LPop(const aKey: string): IRedisResponse;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['LPOP', aKey]);
+end;
+
+function TRedisClient.RPop(const aKey: string): IRedisResponse;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['RPOP', aKey]);
+end;
+
+function TRedisClient.LLen(const aKey: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['LLEN', aKey]).AsInteger;
+end;
+
+function TRedisClient.LRange(const aKey: string; aStart, aStop: Integer): TArray<string>;
+begin
+  ValidateKey(aKey);
+  Result := ResponseToStringArray(ExecuteAndParse(['LRANGE', aKey, IntToStr(aStart), IntToStr(aStop)]));
+end;
+
+function TRedisClient.LIndex(const aKey: string; aIndex: Integer): IRedisResponse;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['LINDEX', aKey, IntToStr(aIndex)]);
+end;
+
+function TRedisClient.LSet(const aKey: string; aIndex: Integer; const aValue: string): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['LSET', aKey, IntToStr(aIndex), aValue]).AsString = 'OK';
+end;
+
+function TRedisClient.LInsert(const aKey: string; aBefore: Boolean; const aPivot, aValue: string): Integer;
+begin
+  ValidateKey(aKey);
+  var lPos := 'AFTER';
+  if aBefore then 
+    lPos := 'BEFORE';
+  Result := ExecuteAndParse(['LINSERT', aKey, lPos, aPivot, aValue]).AsInteger;
+end;
+
+function TRedisClient.LRem(const aKey: string; aCount: Integer; const aValue: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['LREM', aKey, IntToStr(aCount), aValue]).AsInteger;
+end;
+
+function TRedisClient.LTrim(const aKey: string; aStart, aStop: Integer): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['LTRIM', aKey, IntToStr(aStart), IntToStr(aStop)]).AsString = 'OK';
+end;
+
+function TRedisClient.LMove(const aSrc, aDst: string; aSrcLeft, aDstLeft: Boolean): IRedisResponse;
+begin
+  ValidateKey(aSrc);
+  ValidateKey(aDst);
+  var lSrcDir := 'RIGHT'; 
+  if aSrcLeft then 
+    lSrcDir := 'LEFT';
+  var lDstDir := 'RIGHT'; 
+  if aDstLeft then 
+    lDstDir := 'LEFT';
+  Result := ExecuteAndParse(['LMOVE', aSrc, aDst, lSrcDir, lDstDir]);
+end;
+
+// ===========================================================================
+// SET
+// ===========================================================================
+
+function TRedisClient.SAdd(const aKey: string; const aMembers: array of string): Integer;
+begin
+  ValidateKey(aKey);
+  var lCmd := BuildCommandArray('SADD', aKey, aMembers);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.SRem(const aKey: string; const aMembers: array of string): Integer;
+begin
+  ValidateKey(aKey);
+  var lCmd := BuildCommandArray('SREM', aKey, aMembers);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.SMembers(const aKey: string): TArray<string>;
+begin
+  ValidateKey(aKey);
+  Result := ResponseToStringArray(ExecuteAndParse(['SMEMBERS', aKey]));
+end;
+
+function TRedisClient.SIsMember(const aKey, aMember: string): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['SISMEMBER', aKey, aMember]).AsInteger = 1;
+end;
+
+function TRedisClient.SMIsMember(const aKey: string; const aMembers: array of string): TArray<Boolean>;
+begin
+  ValidateKey(aKey);
+  var lCmd := BuildCommandArray('SMISMEMBER', aKey, aMembers);
+  try
+    var lResp := ExecuteAndParse(lCmd.ToArray);
+    var lItems := lResp.AsArray;
+    SetLength(Result, Length(lItems));
+    for var I := 0 to High(lItems) do
+      Result[I] := lItems[I].AsInteger = 1;
+  finally
+    lCmd.Free;
+  end;
+end;
+
+function TRedisClient.SCard(const aKey: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['SCARD', aKey]).AsInteger;
+end;
+
+function TRedisClient.SPop(const aKey: string; aCount: Integer): TArray<string>;
+begin
+  ValidateKey(aKey);
+  if aCount = 1 then
+  begin
+    var lResp := ExecuteAndParse(['SPOP', aKey]);
+    if lResp.IsNull then
+      SetLength(Result, 0)
+    else
+    begin
+      SetLength(Result, 1);
+      Result[0] := lResp.AsString;
+    end;
+  end
+  else
+    Result := ResponseToStringArray(ExecuteAndParse(['SPOP', aKey, IntToStr(aCount)]));
+end;
+
+function TRedisClient.SRandMember(const aKey: string; aCount: Integer): TArray<string>;
+begin
+  ValidateKey(aKey);
+  if aCount = 1 then
+  begin
+    var lResp := ExecuteAndParse(['SRANDMEMBER', aKey]);
+    if lResp.IsNull then
+      SetLength(Result, 0)
+    else
+    begin
+      SetLength(Result, 1);
+      Result[0] := lResp.AsString;
+    end;
+  end
+  else
+    Result := ResponseToStringArray(ExecuteAndParse(['SRANDMEMBER', aKey, IntToStr(aCount)]));
+end;
+
+function TRedisClient.SMove(const aSrc, aDst, aMember: string): Boolean;
+begin
+  ValidateKey(aSrc);
+  ValidateKey(aDst);
+  Result := ExecuteAndParse(['SMOVE', aSrc, aDst, aMember]).AsInteger = 1;
+end;
+
+function TRedisClient.SUnion(const aKeys: array of string): TArray<string>;
+begin
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('SUNION');
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    Result := ResponseToStringArray(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.SUnionStore(const aDst: string; const aKeys: array of string): Integer;
+begin
+  ValidateKey(aDst);
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('SUNIONSTORE'); lCmd.Add(aDst);
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.SInter(const aKeys: array of string): TArray<string>;
+begin
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('SINTER');
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    Result := ResponseToStringArray(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.SInterStore(const aDst: string; const aKeys: array of string): Integer;
+begin
+  ValidateKey(aDst);
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('SINTERSTORE'); lCmd.Add(aDst);
+    for var K in aKeys do 
+	  lCmd.Add(K); 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.SDiff(const aKeys: array of string): TArray<string>;
+begin
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('SDIFF');
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    Result := ResponseToStringArray(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.SDiffStore(const aDst: string; const aKeys: array of string): Integer;
+begin
+  ValidateKey(aDst);
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('SDIFFSTORE'); lCmd.Add(aDst);
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.SScan(const aKey: string; aCursor: Int64; const aPattern: string; aCount: Integer): TRedisScanResult;
+begin
+  ValidateKey(aKey);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('SSCAN'); lCmd.Add(aKey); lCmd.Add(IntToStr(aCursor));
+    if aPattern <> '' then 
+	begin 
+	  lCmd.Add('MATCH'); 
+	  lCmd.Add(aPattern); 
+	end;
+    if aCount > 0 then   
+	begin 
+	  lCmd.Add('COUNT'); 
+	  lCmd.Add(IntToStr(aCount)); 
+	end;
+    Result := ParseScanResponse(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+// ===========================================================================
+// HASH
+// ===========================================================================
+
+function TRedisClient.HSet(const aKey, aField, aValue: string): Boolean;
+begin
+  ValidateKey(aKey);
+  if aField = '' then 
+    raise ERedisValidationException.Create('Il campo non può essere vuoto');
+  Result := ExecuteAndParse(['HSET', aKey, aField, aValue]).AsInteger >= 0;
+end;
+
+function TRedisClient.HGet(const aKey, aField: string): IRedisResponse;
+begin
+  ValidateKey(aKey);
+  if aField = '' then 
+    raise ERedisValidationException.Create('Il campo non può essere vuoto');
+  Result := ExecuteAndParse(['HGET', aKey, aField]);
+end;
+
+function TRedisClient.HGetAll(const aKey: string): TArray<string>;
+begin
+  ValidateKey(aKey);
+  Result := ResponseToStringArray(ExecuteAndParse(['HGETALL', aKey]));
+end;
+
+function TRedisClient.HMGet(const aKey: string; const aFields: array of string): TArray<string>;
+begin
+  ValidateKey(aKey);
+  if Length(aFields) = 0 then
+    raise ERedisValidationException.Create('Specificare almeno un campo');
+  var lCmd := BuildCommandArray('HMGET', aKey, aFields);
+  try 
+    Result := ResponseToStringArray(ExecuteAndParse(lCmd.ToArray)); 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.HMSet(const aKey: string; const aPairs: array of string): Boolean;
+begin
+  ValidateKey(aKey);
+  if (Length(aPairs) = 0) or ((Length(aPairs) mod 2) <> 0) then
+    raise ERedisValidationException.Create('Specificare coppie campo/valore in numero pari');
+  var lCmd := BuildCommandArray('HSET', aKey, aPairs);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger >= 0; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.HDel(const aKey: string; const aFields: array of string): Integer;
+begin
+  ValidateKey(aKey);
+  if Length(aFields) = 0 then
+    raise ERedisValidationException.Create('Specificare almeno un campo');
+  var lCmd := BuildCommandArray('HDEL', aKey, aFields);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.HExists(const aKey, aField: string): Boolean;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['HEXISTS', aKey, aField]).AsInteger = 1;
+end;
+
+function TRedisClient.HKeys(const aKey: string): TArray<string>;
+begin
+  ValidateKey(aKey);
+  Result := ResponseToStringArray(ExecuteAndParse(['HKEYS', aKey]));
+end;
+
+function TRedisClient.HVals(const aKey: string): TArray<string>;
+begin
+  ValidateKey(aKey);
+  Result := ResponseToStringArray(ExecuteAndParse(['HVALS', aKey]));
+end;
+
+function TRedisClient.HLen(const aKey: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['HLEN', aKey]).AsInteger;
+end;
+
+function TRedisClient.HIncrBy(const aKey, aField: string;
+  aIncrement: Int64): Int64;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['HINCRBY', aKey, aField, IntToStr(aIncrement)]).AsInteger;
+end;
+
+function TRedisClient.HIncrByFloat(const aKey, aField: string;
+  aIncrement: Double): Double;
+begin
+  ValidateKey(aKey);
+  var lResp := ExecuteAndParse(['HINCRBYFLOAT', aKey, aField, FloatToRedis(aIncrement)]);
+  Result := RedisToFloat(lResp.AsString);
+end;
+
+function TRedisClient.HRandField(const aKey: string; aCount: Integer): TArray<string>;
+begin
+  ValidateKey(aKey);
+  if aCount = 1 then
+  begin
+    var lResp := ExecuteAndParse(['HRANDFIELD', aKey]);
+    if lResp.IsNull then 
+	  SetLength(Result, 0)
+    else 
+	begin 
+	  SetLength(Result, 1); 
+	  Result[0] := lResp.AsString; 
+	end;
+  end
+  else
+    Result := ResponseToStringArray(ExecuteAndParse(['HRANDFIELD', aKey, IntToStr(aCount)]));
+end;
+
+function TRedisClient.HScan(const aKey: string; aCursor: Int64; const aPattern: string; aCount: Integer): TRedisScanResult;
+begin
+  ValidateKey(aKey);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('HSCAN'); lCmd.Add(aKey); lCmd.Add(IntToStr(aCursor));
+    if aPattern <> '' then 
+	begin 
+	  lCmd.Add('MATCH'); 
+	  lCmd.Add(aPattern); 
+	end;
+    if aCount > 0 then   
+	begin 
+	  lCmd.Add('COUNT'); 
+	  lCmd.Add(IntToStr(aCount)); 
+	end;
+    Result := ParseScanResponse(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+// ===========================================================================
+// SORTED SET
+// ===========================================================================
+
+function TRedisClient.ZAdd(const aKey: string; aScore: Double; const aMember: string): Boolean;
+begin
+  ValidateKey(aKey);
+  if aMember = '' then
+    raise ERedisValidationException.Create('Il membro non può essere vuoto');
+  Result := ExecuteAndParse(['ZADD', aKey, FloatToRedis(aScore), aMember]).AsInteger >= 0;
+end;
+
+function TRedisClient.ZAddOpt(const aKey: string; aScore: Double; const aMember: string; aOption: TRedisZAddOption; aCH: Boolean): Integer;
+begin
+  ValidateKey(aKey);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('ZADD'); lCmd.Add(aKey);
+    case aOption of
+      rzaNX: lCmd.Add('NX');
+      rzaXX: lCmd.Add('XX');
+      rzaGT: lCmd.Add('GT');
+      rzaLT: lCmd.Add('LT');
+    end;
+    if aCH then 
+	  lCmd.Add('CH');
+    lCmd.Add(FloatToRedis(aScore)); lCmd.Add(aMember);
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.ZRem(const aKey: string; const aMembers: array of string): Integer;
+begin
+  ValidateKey(aKey);
+  if Length(aMembers) = 0 then
+    raise ERedisValidationException.Create('Specificare almeno un membro');
+  var lCmd := BuildCommandArray('ZREM', aKey, aMembers);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.ZScore(const aKey, aMember: string): Double;
+begin
+  ValidateKey(aKey);
+  var lResp := ExecuteAndParse(['ZSCORE', aKey, aMember]);
+  if lResp.IsNull then 
+    Result := 0.0
+  else 
+    Result := RedisToFloat(lResp.AsString);
+end;
+
+function TRedisClient.ZIncrBy(const aKey: string; aIncrement: Double; const aMember: string): Double;
+begin
+  ValidateKey(aKey);
+  var lResp := ExecuteAndParse(['ZINCRBY', aKey, FloatToRedis(aIncrement), aMember]);
+  Result := RedisToFloat(lResp.AsString);
+end;
+
+function TRedisClient.ZCard(const aKey: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['ZCARD', aKey]).AsInteger;
+end;
+
+function TRedisClient.ZCount(const aKey, aMin, aMax: string): Integer;
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['ZCOUNT', aKey, aMin, aMax]).AsInteger;
+end;
+
+function TRedisClient.ZRank(const aKey, aMember: string): Integer;
+begin
+  ValidateKey(aKey);
+  var lResp := ExecuteAndParse(['ZRANK', aKey, aMember]);
+  if lResp.IsNull then 
+    Result := -1
+  else 
+    Result := lResp.AsInteger;
+end;
+
+function TRedisClient.ZRevRank(const aKey, aMember: string): Integer;
+begin
+  ValidateKey(aKey);
+  var lResp := ExecuteAndParse(['ZREVRANK', aKey, aMember]);
+  if lResp.IsNull then 
+    Result := -1
+  else 
+    Result := lResp.AsInteger;
+end;
+
+function TRedisClient.ZRange(const aKey: string; aStart, aStop: Integer; aWithScores: Boolean): TArray<string>;
+begin
+  ValidateKey(aKey);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('ZRANGE'); lCmd.Add(aKey);
+    lCmd.Add(IntToStr(aStart)); lCmd.Add(IntToStr(aStop));
+    if aWithScores then 
+	  lCmd.Add('WITHSCORES');
+    Result := ResponseToStringArray(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.ZRevRange(const aKey: string; aStart, aStop: Integer; aWithScores: Boolean): TArray<string>;
+begin
+  ValidateKey(aKey);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('ZREVRANGE'); lCmd.Add(aKey);
+    lCmd.Add(IntToStr(aStart)); lCmd.Add(IntToStr(aStop));
+    if aWithScores then 
+	  lCmd.Add('WITHSCORES');
+    Result := ResponseToStringArray(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.ZRangeByScore(const aKey, aMin, aMax: string; aWithScores: Boolean; aOffset, aCount: Integer): TArray<string>;
+begin
+  ValidateKey(aKey);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('ZRANGEBYSCORE'); lCmd.Add(aKey); lCmd.Add(aMin); lCmd.Add(aMax);
+    if aWithScores then 
+	  lCmd.Add('WITHSCORES');
+    if aCount >= 0 then
+    begin
+      lCmd.Add('LIMIT');
+      lCmd.Add(IntToStr(aOffset));
+      lCmd.Add(IntToStr(aCount));
+    end;
+    Result := ResponseToStringArray(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.ZRevRangeByScore(const aKey, aMax, aMin: string; aWithScores: Boolean; aOffset, aCount: Integer): TArray<string>;
+begin
+  ValidateKey(aKey);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('ZREVRANGEBYSCORE'); lCmd.Add(aKey); lCmd.Add(aMax); lCmd.Add(aMin);
+    if aWithScores then 
+	  lCmd.Add('WITHSCORES');
+    if aCount >= 0 then
+    begin
+      lCmd.Add('LIMIT');
+      lCmd.Add(IntToStr(aOffset));
+      lCmd.Add(IntToStr(aCount));
+    end;
+    Result := ResponseToStringArray(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.ZPopMin(const aKey: string; aCount: Integer): TArray<string>;
+begin
+  ValidateKey(aKey);
+  Result := ResponseToStringArray(ExecuteAndParse(['ZPOPMIN', aKey, IntToStr(aCount)]));
+end;
+
+function TRedisClient.ZPopMax(const aKey: string; aCount: Integer): TArray<string>;
+begin
+  ValidateKey(aKey);
+  Result := ResponseToStringArray(ExecuteAndParse(['ZPOPMAX', aKey, IntToStr(aCount)]));
+end;
+
+function TRedisClient.ZRandMember(const aKey: string; aCount: Integer): TArray<string>;
+begin
+  ValidateKey(aKey);
+  if aCount = 1 then
+  begin
+    var lResp := ExecuteAndParse(['ZRANDMEMBER', aKey]);
+    if lResp.IsNull then 
+	  SetLength(Result, 0)
+    else 
+	begin 
+	  SetLength(Result, 1); 
+	  Result[0] := lResp.AsString; 
+	end;
+  end
+  else
+    Result := ResponseToStringArray(ExecuteAndParse(['ZRANDMEMBER', aKey, IntToStr(aCount)]));
+end;
+
+function TRedisClient.ZScan(const aKey: string; aCursor: Int64; const aPattern: string; aCount: Integer): TRedisScanResult;
+begin
+  ValidateKey(aKey);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('ZSCAN'); lCmd.Add(aKey); lCmd.Add(IntToStr(aCursor));
+    if aPattern <> '' then 
+	begin 
+	  lCmd.Add('MATCH'); 
+	  lCmd.Add(aPattern); 
+	end;
+    if aCount > 0 then   
+	begin 
+	  lCmd.Add('COUNT'); 
+	  lCmd.Add(IntToStr(aCount)); 
+	end;
+    Result := ParseScanResponse(ExecuteAndParse(lCmd.ToArray));
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+// ===========================================================================
+// HYPERLOGLOG
+// ===========================================================================
+
+function TRedisClient.PFAdd(const aKey: string; const aElements: array of string): Boolean;
+begin
+  ValidateKey(aKey);
+  var lCmd := BuildCommandArray('PFADD', aKey, aElements);
+  try 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger = 1; 
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.PFCount(const aKeys: array of string): Int64;
+begin
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('PFCOUNT');
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.PFMerge(const aDstKey: string; const aSrcKeys: array of string): Boolean;
+begin
+  ValidateKey(aDstKey);
+  ValidateKeys(aSrcKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('PFMERGE'); 
+	lCmd.Add(aDstKey);
+    for var K in aSrcKeys do 
+	  lCmd.Add(K);
+    Result := ExecuteAndParse(lCmd.ToArray).AsString = 'OK';
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+// ===========================================================================
+// TRANSAZIONI
+// ===========================================================================
+
+procedure TRedisClient.Watch(const aKeys: array of string);
+begin
+  ValidateKeys(aKeys);
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('WATCH');
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    var lResp := ExecuteAndParse(lCmd.ToArray);
+    if lResp.AsString <> 'OK' then
+      raise ERedisCommandException.Create('WATCH fallito');
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+procedure TRedisClient.Unwatch;
+begin
+  var lResp := ExecuteAndParse(['UNWATCH']);
+  if lResp.AsString <> 'OK' then
+    raise ERedisCommandException.Create('UNWATCH fallito');
+end;
+
+procedure TRedisClient.Multi;
+begin
+  var lResp := ExecuteAndParse(['MULTI']);
+  if lResp.AsString = 'OK' then
+    FInTransaction := True
+  else
+    raise ERedisCommandException.Create('Impossibile avviare la transazione');
+end;
+
+function TRedisClient.Exec: IRedisResponse;
+begin
+  try
+    Result := ExecuteAndParse(['EXEC']);
+  finally
+    FInTransaction := False;
+  end;
+end;
+
+procedure TRedisClient.Discard;
+begin
+  try
+    var lResp := ExecuteAndParse(['DISCARD']);
+    if lResp.AsString <> 'OK' then
+      raise ERedisCommandException.Create('Errore durante il discard');
+  finally
+    FInTransaction := False;
+  end;
+end;
+
+// ===========================================================================
+// PIPELINE
+// ===========================================================================
+
+procedure TRedisClient.BeginPipeline;
+begin
+  if FPipelineActive then
+    raise ERedisPipelineException.Create('Pipeline già attiva');
+  FPipelineActive   := True;
+  FPipelineCmdCount := 0;
+  if Assigned(FLogger) then
+    FLogger.LogInfo('Pipeline avviata');
+end;
+
+procedure TRedisClient.PipelineCommand(const aParts: array of string);
+begin
+  if not FPipelineActive then
+    raise ERedisPipelineException.Create('Pipeline non attiva. Chiamare BeginPipeline prima.');
+  CheckConnection;
+  FTransport.PipelineCommand(aParts);
+  Inc(FPipelineCmdCount);
+end;
+
+function TRedisClient.ExecPipeline: TArray<IRedisResponse>;
+begin
+  if not FPipelineActive then
+    raise ERedisPipelineException.Create('Pipeline non attiva');
+
+  var lCount := FPipelineCmdCount;
+  try
+    // Invia tutto il buffer in un colpo
+    FTransport.FlushPipeline;
+    // Legge N risposte
+    Result := FParser.ParseMultiple(lCount);
+  finally
+    FPipelineActive   := False;
+    FPipelineCmdCount := 0;
+  end;
+
+  if Assigned(FLogger) then
+    FLogger.LogInfo(Format('Pipeline completata: %d risposte ricevute', [Length(Result)]));
+end;
+
+// ===========================================================================
+// LUA SCRIPTING
+// ===========================================================================
+
+function TRedisClient.Eval(const aScript: string; const aKeys: array of string; const aArgs: array of string): IRedisResponse;
+begin
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('EVAL');
+    lCmd.Add(aScript);
+    lCmd.Add(IntToStr(Length(aKeys)));
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    for var A in aArgs do 
+	  lCmd.Add(A);
+    Result := ExecuteAndParse(lCmd.ToArray);
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.EvalSha(const aSha: string; const aKeys: array of string; const aArgs: array of string): IRedisResponse;
+begin
+  var lCmd := TList<string>.Create;
+  try
+    lCmd.Add('EVALSHA');
+    lCmd.Add(aSha);
+    lCmd.Add(IntToStr(Length(aKeys)));
+    for var K in aKeys do 
+	  lCmd.Add(K);
+    for var A in aArgs do 
+	  lCmd.Add(A);
+    Result := ExecuteAndParse(lCmd.ToArray);
+  finally 
+    lCmd.Free; 
+  end;
+end;
+
+function TRedisClient.ScriptLoad(const aScript: string): string;
+begin
+  Result := ExecuteAndParse(['SCRIPT', 'LOAD', aScript]).AsString;
+end;
+
+// ===========================================================================
+// SERVER / ADMIN
+// ===========================================================================
+
+function TRedisClient.DbSize: Int64;
+begin
+  Result := ExecuteAndParse(['DBSIZE']).AsInteger;
+end;
+
+function TRedisClient.FlushDb(aAsync: Boolean): Boolean;
+begin
+  if aAsync then
+    Result := ExecuteAndParse(['FLUSHDB', 'ASYNC']).AsString = 'OK'
+  else
+    Result := ExecuteAndParse(['FLUSHDB']).AsString = 'OK';
+end;
+
+function TRedisClient.Info(const aSection: string): string;
+begin
+  if aSection = '' then
+    Result := ExecuteAndParse(['INFO']).AsString
+  else
+    Result := ExecuteAndParse(['INFO', aSection]).AsString;
+end;
+
+function TRedisClient.Select(aDb: Integer): Boolean;
+begin
+  if aDb < 0 then
+    raise ERedisValidationException.Create('Database non può essere negativo');
+  Result := ExecuteAndParse(['SELECT', IntToStr(aDb)]).AsString = 'OK';
+end;
+
+function TRedisClient.ClientSetName(const aName: string): Boolean;
+begin
+  if aName.Trim = '' then
+    raise ERedisValidationException.Create('Il nome client non può essere vuoto');
+  Result := ExecuteAndParse(['CLIENT', 'SETNAME', aName]).AsString = 'OK';
+end;
+
+function TRedisClient.ClientGetName: string;
+begin
+  var lResp := ExecuteAndParse(['CLIENT', 'GETNAME']);
+  if lResp.IsNull then 
+    Result := ''
+  else 
+    Result := lResp.AsString;
+end;
+
+function TRedisClient.ConfigGet(const aParameter: string): TArray<string>;
+begin
+  Result := ResponseToStringArray(ExecuteAndParse(['CONFIG', 'GET', aParameter]));
+end;
+
+function TRedisClient.ConfigSet(const aName, aValue: string): Boolean;
+begin
+  Result := ExecuteAndParse(['CONFIG', 'SET', aName, aValue]).AsString = 'OK';
+end;
+
+// ===========================================================================
+// PUB/SUB
+// ===========================================================================
+
+function TRedisClient.CreatePublisher: IRedisPubSubPublisher;
+begin
+  Result := TRedisPubSubPublisher.Create(FConfig, FLogger);
+end;
+
+function TRedisClient.CreateSubscriber: IRedisPubSubClient;
+begin
+  Result := TRedisPubSubClient.Create(FConfig, FLogger);
+end;
+
+function TRedisClient.Publish(const aChannel, aMessage: string): Integer;
+begin
+  if aChannel.Trim = '' then
+    raise ERedisValidationException.Create('Il canale non può essere vuoto');
+  Result := ExecuteAndParse(['PUBLISH', aChannel, aMessage]).AsInteger;
+end;
+
+// ===========================================================================
+// COMANDO GENERICO
+// ===========================================================================
+
+function TRedisClient.ExecuteCommand(const aParts: array of string): IRedisResponse;
+begin
+  if Length(aParts) = 0 then
+    raise ERedisValidationException.Create('Il comando non può essere vuoto');
+  Result := ExecuteAndParse(aParts);
+end;
+
+end.

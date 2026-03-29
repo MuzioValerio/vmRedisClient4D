@@ -1,3 +1,22 @@
+{-----------------------------------------------------------------------------
+ Project: vmRedisClient
+ Unit Name: RedisClientTests
+ Author:    Muzio Valerio
+ Copyright: (C) 2025-2026 Muzio Valerio
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-----------------------------------------------------------------------------}
+
 program RedisClientTests;
 
 {$IFNDEF TESTINSIGHT}
@@ -14,18 +33,23 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   {$ENDIF }
   DUnitX.TestFramework,
-  Redis.Types in '..\Redis.Types.pas',
-  Redis.Response in '..\Redis.Response.pas',
-  Redis.Protocol in '..\Redis.Protocol.pas',
-  Redis.Connection.Config in '..\Redis.Connection.Config.pas',
-  Redis.Transport.Synapse in '..\Redis.Transport.Synapse.pas',
-  Redis.Client.Intf in '..\Redis.Client.Intf.pas',
-  Redis.Client in '..\Redis.Client.pas',
-  Redis.Pool in '..\Redis.Pool.pas',
-  Redis.PubSub in '..\Redis.PubSub.pas',
   Redis.Client.Tests in 'Redis.Client.Tests.pas',
   Redis.Pool.Tests in 'Redis.Pool.Tests.pas',
-  Redis.PubSub.Tests in 'Redis.PubSub.Tests.pas';
+  Redis.PubSub.Tests in 'Redis.PubSub.Tests.pas',
+  Redis.Client in '..\sources\Redis.Client.pas',
+  Redis.Client.Intf in '..\sources\Redis.Client.Intf.pas',
+  Redis.Connection.Config in '..\sources\Redis.Connection.Config.pas',
+  Redis.HealthCheck in '..\sources\Redis.HealthCheck.pas',
+  Redis.Logger.Empty in '..\sources\Redis.Logger.Empty.pas',
+  Redis.Pool in '..\sources\Redis.Pool.pas',
+  Redis.Protocol in '..\sources\Redis.Protocol.pas',
+  Redis.PubSub in '..\sources\Redis.PubSub.pas',
+  Redis.Response in '..\sources\Redis.Response.pas',
+  Redis.Transport.Intf in '..\sources\Redis.Transport.Intf.pas',
+  Redis.Transport.Native in '..\sources\Redis.Transport.Native.pas',
+  Redis.Transport.Registry in '..\sources\Redis.Transport.Registry.pas',
+  Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas',
+  Redis.Types in '..\sources\Redis.Types.pas';
 
 {$R *.RES}
 

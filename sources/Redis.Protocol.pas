@@ -1,16 +1,19 @@
-{-----------------------------------------------------------------------------
+﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Copyright (C) 2025 Muzio Valerio
-
  Unit Name: Redis.Protocol
+ Copyright (C) 2025-2026 Muzio Valerio
  Author:    VMuzio
  Date:      14-dic-2025
- Updated:   2026 - Fix CRLF platform-dependent, aggiunto Pipeline support
+ Updated:   2026 - Fix CRLF platform-dependent, Pipeline support,
+                   IRedisDataReader spostato in Redis.Transport.Intf
 
  Info:
    Parser RESP2 e serializzatore comandi Redis.
    IMPORTANTE: usa RESP_CRLF = #13#10 (fisso) invece di sLineBreak
    che su Linux sarebbe solo #10 e causerebbe errori di protocollo.
+
+   IRedisDataReader è definito in Redis.Transport.Intf e ri-esportato
+   qui via uses per retrocompatibilità con il codice esistente.
 -----------------------------------------------------------------------------}
 
 unit Redis.Protocol;
@@ -20,33 +23,10 @@ interface
 uses
   System.SysUtils, System.Classes, System.Generics.Collections,
   Redis.Types,
-  Redis.Response;
+  Redis.Response,
+  Redis.Transport.Intf;   // IRedisDataReader, IRedisTransport
 
 type
-  // Interfaccia per leggere dati dalla connessione
-  IRedisDataReader = interface(IInterface)
-  ['{C60DC95F-C6E2-4E08-9A6A-9436AC8D8516}']
-    function ReadLine: string;
-    function ReadBytes(aCount: Integer): TBytes;
-  end;
-
-type
-  IRedisSynapseTransport = interface(IRedisDataReader)
-  ['{FD938863-245D-4DAE-87BE-BD8DFC12E79E}']
-    procedure Connect;
-    procedure Disconnect;
-    function IsConnected: Boolean;
-
-    procedure Send(const aData: TBytes);
-    procedure SendCommand(const aParts: array of string);
-
-    // Pipeline: accumula comandi senza inviarli
-    procedure PipelineCommand(const aParts: array of string);
-    // Invia tutti i comandi in pipeline e svuota il buffer
-    function FlushPipeline: TBytes;
-    function IsPipelining: Boolean;
-  end;
-
   // ---------------------------------------------------------------------------
   // Parser del protocollo RESP2
   // ---------------------------------------------------------------------------
@@ -68,7 +48,7 @@ type
 
   // ---------------------------------------------------------------------------
   // Serializzatore comandi Redis
-  // Usa sempre RESP_CRLF (#13#10) - mai sLineBreak
+  // Usa sempre RESP_CRLF (#13#10) — mai sLineBreak
   // ---------------------------------------------------------------------------
   TRedisCommandSerializer = class(TObject)
   public
@@ -91,14 +71,13 @@ begin
 end;
 
 function TRedisProtocolParser.Parse: IRedisResponse;
-var
-  lDataType: TRedisDataType;
 begin
   var lLine := FReader.ReadLine;
   if Length(lLine) = 0 then
     raise ERedisProtocolException.Create('Risposta vuota dal server');
 
   var lFirstChar := lLine[1];
+  var lDataType := TRedisDataType.rdtNone;
   lDataType := lDataType.FromChar(lFirstChar);
 
   case lDataType of
@@ -142,7 +121,6 @@ function TRedisProtocolParser.ParseBulkString(const aLine: string): IRedisRespon
 var
   lSize: Integer;
   lData: TBytes;
-  lStrValue: string;
 begin
   var lSizeStr := RemoveFirstChar(aLine);
   lSize := StrToIntDef(lSizeStr, -1);
@@ -155,14 +133,14 @@ begin
 
   if lSize = 0 then
   begin
-    FReader.ReadLine; // consuma CRLF finale
+    FReader.ReadLine;  // consuma CRLF finale
     Result := TRedisResponseBuilder.CreateBulkString('');
     Exit;
   end;
 
   lData := FReader.ReadBytes(lSize);
-  lStrValue := TEncoding.UTF8.GetString(lData);
-  FReader.ReadLine; // consuma CRLF finale
+  var lStrValue := TEncoding.UTF8.GetString(lData);
+  FReader.ReadLine;  // consuma CRLF finale
 
   Result := TRedisResponseBuilder.CreateBulkString(lStrValue);
 end;
@@ -170,7 +148,7 @@ end;
 function TRedisProtocolParser.ParseArray(const aLine: string): IRedisResponse;
 begin
   var lCountStr := RemoveFirstChar(aLine);
-  var lCount := StrToIntDef(lCountStr, -1);
+  var lCount    := StrToIntDef(lCountStr, -1);
 
   if lCount = -1 then
   begin
@@ -231,7 +209,7 @@ begin
     begin
       // $<len>\r\n
       lSize := '$' + IntToStr(Length(aParts[I])) + RESP_CRLF;
-      lLine := TEncoding.ASCII.GetBytes(lSize);
+      lLine  := TEncoding.ASCII.GetBytes(lSize);
       lStream.WriteBuffer(lLine[0], Length(lLine));
 
       // <data>\r\n

@@ -1,15 +1,28 @@
-{-----------------------------------------------------------------------------
+﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Copyright (C) 2025 Muzio Valerio
-
  Unit Name: Redis.Types
+ Copyright (C) 2025-2026 Muzio Valerio
  Author:    VMuzio
  Date:      14-dic-2025
- Updated:   2026 - Aggiornamento completo per Redis 8.x
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
 
  Info:
    Tipi, costanti ed eccezioni del client Redis.
    Supporta RESP2 (RESP3 pronto per estensione futura).
+ Purpose:
+ History:
+  Updated: 2026 - Aggiornamento completo per Redis 8.x
 -----------------------------------------------------------------------------}
 
 unit Redis.Types;

@@ -1,26 +1,11 @@
-﻿{-----------------------------------------------------------------------------
+{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Copyright (C) 2025 Muzio Valerio
-
  Unit Name: Redis.Client.Intf
- Author:    VMuzio
+ Copyright (C) 2025-2026 Muzio Valerio
+ Author:    Muzio Valerio
  Date:      14-dic-2025
- Updated:   2026 - Aggiornamento completo per Redis 8.x
-
- Aggiunto:
-   - MGet, MSet, MSetNX, GetSet, IncrByFloat, SetRange, GetRange, PSetEx
-   - Persist, PExpire, PExpireAt, ExpireAt, ExpireTime, PExpireTime, PTTL
-   - Rename, RenameNX, KeyType, Unlink, Copy, RandomKey
-   - HMGet, HMSet, HIncrBy, HIncrByFloat, HRandField
-   - SMove, SPop, SRandMember, SUnion, SInter, SDiff e varianti Store
-   - ZIncrBy, ZCount, ZRank, ZRevRank, ZRevRange, ZRangeByScore,
-     ZRevRangeByScore, ZPopMin, ZPopMax, ZRandMember
-   - LSet, LInsert, LRem, LTrim, LMove
-   - Watch, Unwatch (optimistic locking)
-   - Eval, EvalSha, ScriptLoad (Lua)
-   - DbSize, FlushDb, Info, Select, ClientSetName, ClientGetName
-   - Pipeline: BeginPipeline, PipelineCommand, ExecPipeline
-   - Scan ora restituisce TRedisScanResult (cursore + elementi)
+ Updated:   2026 - Rimossa dipendenza da Redis.Transport.Synapse:
+                   l'interfaccia non deve dipendere dall'implementazione.
 -----------------------------------------------------------------------------}
 
 unit Redis.Client.Intf;
@@ -31,8 +16,6 @@ uses
   System.Classes, System.SysUtils, System.Generics.Collections,
   Redis.Types,
   Redis.Response,
-  Redis.Protocol,
-  Redis.Transport.Synapse,
   Redis.PubSub,
   Redis.Connection.Config;
 
@@ -55,27 +38,22 @@ type
     // =========================================================================
     function Get(const aKey: string): IRedisResponse;
     function SetValue(const aKey, aValue: string): Boolean;
-    /// SET con opzioni NX/XX e scadenza (Redis 2.6.12+)
     function SetEx(const aKey, aValue: string; aSeconds: Integer): Boolean;
     function PSetEx(const aKey, aValue: string; aMilliseconds: Int64): Boolean;
     function SetNX(const aKey, aValue: string): Boolean;
     function GetEx(const aKey: string; aSeconds: Integer): IRedisResponse;
-    /// GetEx senza scadenza (PERSIST): GetExPersist
     function GetExPersist(const aKey: string): IRedisResponse;
     function GetDel(const aKey: string): IRedisResponse;
     function GetSet(const aKey, aValue: string): IRedisResponse;
 
-    // Multi-key
     function MGet(const aKeys: array of string): TArray<string>;
-    function MSet(const aPairs: array of string): Boolean;   // [k1,v1,k2,v2,...]
+    function MSet(const aPairs: array of string): Boolean;
     function MSetNX(const aPairs: array of string): Boolean;
 
-    // Cancellazione / Existance
     function Del(const aKeys: array of string): Integer;
     function Unlink(const aKeys: array of string): Integer;
     function Exists(const aKeys: array of string): Integer;
 
-    // TTL / Scadenza
     function Expire(const aKey: string; aSeconds: Integer): Boolean;
     function PExpire(const aKey: string; aMilliseconds: Int64): Boolean;
     function ExpireAt(const aKey: string; aUnixTimestamp: Int64): Boolean;
@@ -83,19 +61,16 @@ type
     function Persist(const aKey: string): Boolean;
     function TTL(const aKey: string): Integer;
     function PTTL(const aKey: string): Int64;
-    function ExpireTime(const aKey: string): Int64;   // Redis 7+
-    function PExpireTime(const aKey: string): Int64;  // Redis 7+
+    function ExpireTime(const aKey: string): Int64;
+    function PExpireTime(const aKey: string): Int64;
 
-    // Ispezione
-    function KeyType(const aKey: string): string;    // TYPE (evita keyword conflict)
+    function KeyType(const aKey: string): string;
     function Rename(const aKey, aNewKey: string): Boolean;
     function RenameNX(const aKey, aNewKey: string): Boolean;
     function RandomKey: string;
     function Copy(const aSrcKey, aDstKey: string; aReplace: Boolean = False): Boolean;
 
-    // Iterazione
     function Keys(const aPattern: string): TArray<string>;
-    /// Scan restituisce cursore + elementi. Iterare finché Cursor = 0
     function Scan(aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TRedisScanResult;
 
     // =========================================================================
@@ -124,11 +99,9 @@ type
     function LRange(const aKey: string; aStart, aStop: Integer): TArray<string>;
     function LIndex(const aKey: string; aIndex: Integer): IRedisResponse;
     function LSet(const aKey: string; aIndex: Integer; const aValue: string): Boolean;
-    /// LInsert: aBefore=True -> BEFORE pivot, False -> AFTER pivot
     function LInsert(const aKey: string; aBefore: Boolean; const aPivot, aValue: string): Integer;
     function LRem(const aKey: string; aCount: Integer; const aValue: string): Integer;
     function LTrim(const aKey: string; aStart, aStop: Integer): Boolean;
-    /// LMove: aSrcLeft=True pop da sinistra src, aDstLeft=True push a sinistra dst
     function LMove(const aSrc, aDst: string; aSrcLeft, aDstLeft: Boolean): IRedisResponse;
 
     // =========================================================================
@@ -173,7 +146,6 @@ type
     // Sorted Set
     // =========================================================================
     function ZAdd(const aKey: string; aScore: Double; const aMember: string): Boolean;
-    /// ZAdd con opzioni: NX, XX, GT, LT, CH
     function ZAddOpt(const aKey: string; aScore: Double; const aMember: string; aOption: TRedisZAddOption; aCH: Boolean = False): Integer;
     function ZRem(const aKey: string; const aMembers: array of string): Integer;
     function ZScore(const aKey, aMember: string): Double;
@@ -210,11 +182,8 @@ type
     // =========================================================================
     // Pipeline
     // =========================================================================
-    /// Attiva la modalità pipeline: i comandi vengono bufferizzati
     procedure BeginPipeline;
-    /// Aggiunge un comando al buffer pipeline (attiva BeginPipeline prima)
     procedure PipelineCommand(const aParts: array of string);
-    /// Invia tutti i comandi bufferizzati e restituisce le N risposte
     function  ExecPipeline: TArray<IRedisResponse>;
 
     // =========================================================================
@@ -230,7 +199,6 @@ type
     function  DbSize: Int64;
     function  FlushDb(aAsync: Boolean = False): Boolean;
     function  Info(const aSection: string = ''): string;
-    /// Select: attenzione - nel pool ogni connessione va gestita separatamente
     function  Select(aDb: Integer): Boolean;
     function  ClientSetName(const aName: string): Boolean;
     function  ClientGetName: string;
@@ -245,7 +213,7 @@ type
     function Publish(const aChannel, aMessage: string): Integer;
 
     // =========================================================================
-    // Comando generico (escape hatch per comandi non implementati)
+    // Comando generico
     // =========================================================================
     function ExecuteCommand(const aParts: array of string): IRedisResponse;
   end;

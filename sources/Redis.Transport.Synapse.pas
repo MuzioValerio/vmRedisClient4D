@@ -1,19 +1,16 @@
 {-----------------------------------------------------------------------------
  Project: vmRedisClient
- Copyright (C) 2025 Muzio Valerio
-
  Unit Name: Redis.Transport.Synapse
- Author:    VMuzio
+ Copyright (C) 2025-2026 Muzio Valerio
+ Author:    Muzio Valerio
  Date:      14-dic-2025
- Updated:   2026 - Fix bug AUTH parsing, fix QUIT senza read,
-                   aggiunto Pipeline, riconnessione automatica
+ Updated:   2026 - Implementa IRedisTransport (alias IRedisSynapseTransport),
+                   autoregistrazione nel Registry con ID = 'synapse'
 
- Fix applicati:
-   1. AuthenticateWithRetry: ora usa il parser RESP invece di ReadLine grezzo
-   2. Disconnect: legge la risposta +OK dopo QUIT prima di chiudere
-   3. Pipeline: PipelineCommand / FlushPipeline / IsPipelining
-   4. Reconnect automatico in caso di connessione persa
-   5. CLIENT SETNAME opzionale dopo connessione
+ Info:
+   Transport Redis basato su Synapse (TTCPBlockSocket + ssl_openssl3).
+   Aggiunge autoregistrazione nel Registry: include questa unit nel
+   progetto per abilitare il provider 'synapse'.
 -----------------------------------------------------------------------------}
 
 unit Redis.Transport.Synapse;
@@ -25,15 +22,18 @@ uses
   synsock, blcksock, ssl_openssl3, synautil,
   Redis.Types,
   Redis.Protocol,
+  Redis.Transport.Intf,
+  Redis.Transport.Registry,
   Redis.Connection.Config;
 
 type
-  TRedisSynapseTransport = class(TInterfacedObject, IRedisSynapseTransport)
+  TRedisSynapseTransport = class(TInterfacedObject, IRedisTransport)
   strict private
     FSocket: TTCPBlockSocket;
     FConfig: TRedisConnectionConfig;
     FConnected: Boolean;
     FLogger: IRedisLogger;
+
     // Pipeline buffer
     FPipelineBuffer: TMemoryStream;
     FPipelineCount: Integer;
@@ -44,37 +44,34 @@ type
     procedure AuthenticateWithRetry;
     procedure SetClientName;
     procedure Log(const aMessage: string; aIsError: Boolean = False);
-    // Legge una singola riga dal socket (usato internamente per AUTH)
-    function ReadRawLine: string;
-  private
+    function  ReadRawLine: string;
+  private  
     constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil); reintroduce;
+  public
+    destructor  Destroy; override;
 
-    // IRedisSynapseTransport
+    class function New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil): IRedisTransport;
+
+    { IRedisTransport }
     procedure Connect;
     procedure Disconnect;
-    function IsConnected: Boolean;
-
+    function  IsConnected: Boolean;
     procedure Send(const aData: TBytes);
     procedure SendCommand(const aParts: array of string);
-
-    // Pipeline
     procedure PipelineCommand(const aParts: array of string);
-    function FlushPipeline: TBytes;
-    function IsPipelining: Boolean;
+    function  FlushPipeline: TBytes;
+    function  IsPipelining: Boolean;
 
-    // IRedisDataReader
+    { IRedisDataReader }
     function ReadLine: string;
     function ReadBytes(aCount: Integer): TBytes;
-  public
-    destructor Destroy; override;
-    class function New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil): IRedisSynapseTransport;
   end;
 
 implementation
 
 { TRedisSynapseTransport }
 
-class function TRedisSynapseTransport.New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger): IRedisSynapseTransport;
+class function TRedisSynapseTransport.New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger): IRedisTransport;
 begin
   Result := TRedisSynapseTransport.Create(aConfig, aLogger);
 end;
@@ -88,6 +85,7 @@ begin
   FLogger := aLogger;
   FSocket := TTCPBlockSocket.Create;
   FConnected := False;
+
   FPipelining := False;
   FPipelineCount := 0;
   FPipelineBuffer := TMemoryStream.Create;
@@ -95,7 +93,7 @@ begin
   FSocket.ConnectionTimeout := aConfig.ConnectionTimeout;
   FSocket.SetTimeout(aConfig.ReadTimeout);
 
-  Log('Transport Redis creato per ' + aConfig.Host + ':' + IntToStr(aConfig.Port));
+  Log('Transport Synapse creato per ' + aConfig.Host + ':' + IntToStr(aConfig.Port));
 end;
 
 destructor TRedisSynapseTransport.Destroy;
@@ -103,7 +101,7 @@ begin
   Disconnect;
   FSocket.Free;
   FPipelineBuffer.Free;
-  inherited Destroy;
+  inherited;
 end;
 
 procedure TRedisSynapseTransport.Log(const aMessage: string; aIsError: Boolean);
@@ -159,17 +157,14 @@ begin
 end;
 
 function TRedisSynapseTransport.ReadRawLine: string;
-// Lettura grezza usata SOLO durante AUTH prima che il parser sia disponibile
 var
   lLine: AnsiString;
 begin
-  lLine := FSocket.RecvString(FConfig.ReadTimeout);
+  lLine  := FSocket.RecvString(FConfig.ReadTimeout);
   Result := string(lLine);
 end;
 
 procedure TRedisSynapseTransport.AuthenticateWithRetry;
-// FIX: ora interpreta correttamente la risposta RESP invece di usare Pos('+OK')
-// che fallisce se Redis risponde con un errore formattato (-ERR ...)
 var
   lRawResp: string;
   lRetries: Integer;
@@ -188,7 +183,6 @@ begin
         else
           SendCommand(['AUTH', FConfig.Password.Trim]);
 
-        // Legge la risposta grezza (siamo nella fase di setup, prima del parser)
         lRawResp := ReadRawLine;
 
         if lRawResp.StartsWith('+') then
@@ -197,13 +191,12 @@ begin
           Log('Autenticazione completata con successo');
         end
         else if lRawResp.StartsWith('-') then
-          raise ERedisConnectionException.Create('Autenticazione rifiutata dal server: ' +
-            lRawResp.Substring(1))
+          raise ERedisConnectionException.Create('Autenticazione rifiutata dal server: ' + lRawResp.Substring(1))
         else
           raise ERedisConnectionException.Create('Risposta autenticazione inattesa: ' + lRawResp);
       except
         on E: ERedisConnectionException do
-          raise; // propaga errori di autenticazione senza retry
+          raise;
         on E: Exception do
         begin
           Inc(lRetries);
@@ -218,7 +211,6 @@ begin
     end;
   end;
 
-  // Selezione database se diverso da 0
   if FConfig.Database <> 0 then
   begin
     SendCommand(['SELECT', IntToStr(FConfig.Database)]);
@@ -230,10 +222,8 @@ begin
 end;
 
 procedure TRedisSynapseTransport.SetClientName;
-// Imposta il nome del client se configurato (utile per CLIENT LIST lato server)
 begin
-  if FConfig.ClientName.Trim = '' then 
-    Exit;
+  if FConfig.ClientName.Trim = '' then Exit;
   try
     SendCommand(['CLIENT', 'SETNAME', FConfig.ClientName.Trim]);
     var lResp := ReadRawLine;
@@ -272,14 +262,14 @@ begin
       begin
         Inc(lRetries);
         FSocket.CloseSocket;
-        lConnected := False;
         FConnected := False;
-		
+
         if lRetries > FConfig.MaxRetries then
         begin
-          FConnected := False;
           Log('Connessione fallita dopo ' + IntToStr(lRetries) + ' tentativi', True);
-          raise ERedisConnectionException.CreateFmt('Impossibile connettersi a Redis dopo %d tentativi. Errore: %s', [lRetries, E.Message]);
+          raise ERedisConnectionException.CreateFmt(
+            'Impossibile connettersi a Redis dopo %d tentativi. Errore: %s',
+            [lRetries, E.Message]);
         end;
 
         Log('Tentativo ' + IntToStr(lRetries) + ' fallito, riprovo...', True);
@@ -293,18 +283,14 @@ procedure TRedisSynapseTransport.Disconnect;
 begin
   if FSocket.Socket <> INVALID_SOCKET then
   begin
-    // FIX: invia QUIT e legge la risposta prima di chiudere
-    // (evita che +OK rimanga nel buffer e venga interpretato dal parser)
     try
       SendCommand(['QUIT']);
-      // Consuma la risposta +OK
-      ReadRawLine;
+      ReadRawLine;  // consuma +OK
       Log('Inviato comando QUIT');
     except
       on E: Exception do
         Log('Errore durante QUIT: ' + E.Message, True);
     end;
-
     try
       FSocket.CloseSocket;
       Log('Disconnesso da Redis');
@@ -353,8 +339,6 @@ end;
 
 procedure TRedisSynapseTransport.SendCommand(const aParts: array of string);
 begin
-  var lData := TRedisCommandSerializer.Serialize(aParts);
-
   if Assigned(FLogger) then
   begin
     var lCmdStr := '';
@@ -369,12 +353,8 @@ begin
     FLogger.LogCommand(lCmdStr);
   end;
 
-  Send(lData);
+  Send(TRedisCommandSerializer.Serialize(aParts));
 end;
-
-// ---------------------------------------------------------------------------
-// Pipeline support
-// ---------------------------------------------------------------------------
 
 procedure TRedisSynapseTransport.PipelineCommand(const aParts: array of string);
 var
@@ -393,7 +373,8 @@ begin
 end;
 
 function TRedisSynapseTransport.FlushPipeline: TBytes;
-// Invia tutto il buffer accumulato in un unico write e resetta lo stato
+var
+  lCount: Integer;
 begin
   if FPipelineCount = 0 then
   begin
@@ -401,16 +382,13 @@ begin
     Exit;
   end;
 
-  var lCount := FPipelineCount;
-
+  lCount := FPipelineCount;
   SetLength(Result, FPipelineBuffer.Size);
   FPipelineBuffer.Position := 0;
   FPipelineBuffer.ReadBuffer(Result[0], FPipelineBuffer.Size);
 
-  // Invia tutto in un colpo solo
   Send(Result);
 
-  // Reset stato pipeline
   FPipelineBuffer.Clear;
   FPipelineCount := 0;
   FPipelining := False;
@@ -423,10 +401,6 @@ function TRedisSynapseTransport.IsPipelining: Boolean;
 begin
   Result := FPipelining;
 end;
-
-// ---------------------------------------------------------------------------
-// Lettura
-// ---------------------------------------------------------------------------
 
 function TRedisSynapseTransport.ReadLine: string;
 begin
@@ -488,5 +462,16 @@ begin
     end;
   end;
 end;
+
+// ---------------------------------------------------------------------------
+// Autoregistrazione
+// ---------------------------------------------------------------------------
+
+initialization
+  TRedisTransportRegistry.RegisterProvider('synapse',
+    function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport
+    begin
+      Result := TRedisSynapseTransport.Create(aConfig, aLogger);
+    end);
 
 end.
