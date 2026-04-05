@@ -134,7 +134,7 @@ begin
   FRedisConfig.ConnectionTimeout := 3000;
   FRedisConfig.ReadTimeout := 3000;
   
-  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig);
+  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, 'grijjy');
 end;
 
 procedure TRedisPoolTests.TearDown;

@@ -25,28 +25,28 @@ uses
 
 procedure Example_HealthCheck_Detailed;
 var
-  Config: TRedisConnectionConfig;
-  Client: IRedisClient;
-  Logger: IRedisLogger;
+  lConfig: TRedisConnectionConfig;
+  lClient: IRedisClient;
+  lLogger: IRedisLogger;
   Health: TRedisHealthInfo;
 begin
   WriteLn('=== Esempio HealthCheck Dettagliato ===');
   WriteLn;
 
-  Config.Host := 'localhost';
-  Config.Port := 6379;
+  lConfig.Host := 'localhost';
+  lConfig.Port := 6379;
 
-  Logger := TSimpleRedisLogger.New();
-  Client := TRedisClient.New(Config, Logger);
+  lLogger := TSimpleRedisLogger.New();
+  lClient := TRedisClient.New(lConfig, lLogger, 'grijjy');
 
   try
     WriteLn('Connessione a Redis...');
-    Client.Connect;
+    lClient.Connect;
     WriteLn('Connesso!');
     WriteLn;
 
     // Health check dettagliato
-    Health := Client.HealthCheckDetailed;
+    Health := lClient.HealthCheckDetailed;
 
     WriteLn('Risultati Health Check:');
     WriteLn('------------------------');
@@ -60,8 +60,7 @@ begin
     end;
 
     // Log automatico dello stato
-    Client.LogHealthStatus;
-
+    lClient.LogHealthStatus;
   except
     on E: Exception do
       WriteLn('ERRORE: ' + E.Message);
@@ -72,32 +71,32 @@ end;
 
 procedure Example_HealthCheck_Monitoring;
 var
-  Config: TRedisConnectionConfig;
-  Client: IRedisClient;
-  Logger: IRedisLogger;
-  Health: TRedisHealthInfo;
-  CheckCount: Integer;
-  FailCount: Integer;
-  MaxFails: Integer;
+  lConfig: TRedisConnectionConfig;
+  lClient: IRedisClient;
+  lLogger: IRedisLogger;
+  lHealth: TRedisHealthInfo;
+  lCheckCount: Integer;
+  lFailCount: Integer;
+  lMaxFails: Integer;
 begin
   WriteLn('=== Esempio Monitoring Continuo ===');
   WriteLn('(Controlla Redis ogni 5 secondi, premi CTRL+C per uscire)');
   WriteLn;
 
-  Config.Host := 'localhost';
-  Config.Port := 6379;
-  Config.MaxRetries := 3;
+  lConfig.Host := 'localhost';
+  lConfig.Port := 6379;
+  lConfig.MaxRetries := 3;
 
-  Logger := TSimpleRedisLogger.New();
-  Client := TRedisClient.New(Config, Logger, 'grijjy');
+  lLogger := TSimpleRedisLogger.New();
+  lClient := TRedisClient.New(lConfig, lLogger, 'grijjy');
 
-  CheckCount := 0;
-  FailCount := 0;
-  MaxFails := 3;
+  lCheckCount := 0;
+  lFailCount := 0;
+  lMaxFails := 3;
 
   try
     WriteLn('Connessione iniziale a Redis...');
-    Client.Connect;
+    lClient.Connect;
     WriteLn('Connesso!');
     WriteLn;
     WriteLn('Inizio monitoring...');
@@ -106,32 +105,32 @@ begin
     // Simula monitoring continuo (in produzione userai un timer)
     while True do
     begin
-      Inc(CheckCount);
-      WriteLn(Format('[Check #%d] %s', [CheckCount, DateTimeToStr(Now)]));
+      Inc(lCheckCount);
+      WriteLn(Format('[Check #%d] %s', [lCheckCount, DateTimeToStr(Now)]));
 
-      Health := Client.HealthCheckDetailed;
+      lHealth := lClient.HealthCheckDetailed;
 
-      if Health.IsHealthy then
+      if lHealth.IsHealthy then
       begin
-        WriteLn(Format('  ✓ Healthy - Ping: %d ms', [Health.PingResponseTimeMs]));
-        FailCount := 0; // Reset contatore fallimenti
+        WriteLn(Format('  ✓ Healthy - Ping: %d ms', [lHealth.PingResponseTimeMs]));
+        lFailCount := 0; // Reset contatore fallimenti
       end
       else
       begin
-        Inc(FailCount);
-        WriteLn(Format('  ✗ Unhealthy - %s', [Health.ErrorMessage]));
-        WriteLn(Format('  Fallimenti consecutivi: %d/%d', [FailCount, MaxFails]));
+        Inc(lFailCount);
+        WriteLn(Format('  ✗ Unhealthy - %s', [lHealth.ErrorMessage]));
+        WriteLn(Format('  Fallimenti consecutivi: %d/%d', [lFailCount, lMaxFails]));
 
         // Se supera il numero massimo di fallimenti, prova a riconnettersi
-        if FailCount >= MaxFails then
+        if lFailCount >= lMaxFails then
         begin
           WriteLn('  ! Troppi fallimenti, tentativo di riconnessione...');
           try
-            Client.Disconnect;
+            lClient.Disconnect;
             Sleep(1000);
-            Client.Connect;
+            lClient.Connect;
             WriteLn('  ✓ Riconnesso con successo');
-            FailCount := 0;
+            lFailCount := 0;
           except
             on E: Exception do
               WriteLn('  ✗ Riconnessione fallita: ' + E.Message);
@@ -141,14 +140,12 @@ begin
 
       WriteLn;
 
-      // Attendi 5 secondi prima del prossimo check
+      // Attende 5 secondi prima del prossimo check
       Sleep(5000);
 
-      // In un'applicazione reale, useresti un meccanismo per interrompere il loop
-      if CheckCount >= 10 then // Dopo 10 check esci (esempio)
+      if lCheckCount >= 10 then // Dopo 10 check esce (esempio)
         Break;
     end;
-
   except
     on E: Exception do
       WriteLn('ERRORE CRITICO: ' + E.Message);

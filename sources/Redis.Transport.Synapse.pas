@@ -4,13 +4,27 @@
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio
  Date:      14-dic-2025
- Updated:   2026 - Implementa IRedisTransport (alias IRedisSynapseTransport),
-                   autoregistrazione nel Registry con ID = 'synapse'
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
 
  Info:
    Transport Redis basato su Synapse (TTCPBlockSocket + ssl_openssl3).
-   Aggiunge autoregistrazione nel Registry: include questa unit nel
-   progetto per abilitare il provider 'synapse'.
+   Aggiunge autoregistrazione nel Registry:
+    - includere questa unit nel progetto per abilitare il provider 'synapse'.
+ Purpose:
+ History:
+  - Updated:   2026 - Implementa IRedisTransport (alias IRedisSynapseTransport),
+                      autoregistrazione nel Registry con ID = 'synapse'
 -----------------------------------------------------------------------------}
 
 unit Redis.Transport.Synapse;

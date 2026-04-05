@@ -4,16 +4,25 @@
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    VMuzio
  Date:      14-dic-2025
- Updated:   2026 - Fix CRLF platform-dependent, Pipeline support,
-                   IRedisDataReader spostato in Redis.Transport.Intf
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
 
  Info:
    Parser RESP2 e serializzatore comandi Redis.
-   IMPORTANTE: usa RESP_CRLF = #13#10 (fisso) invece di sLineBreak
-   che su Linux sarebbe solo #10 e causerebbe errori di protocollo.
-
-   IRedisDataReader è definito in Redis.Transport.Intf e ri-esportato
-   qui via uses per retrocompatibilità con il codice esistente.
+ Purpose:
+ History:
+  - Updated:   2026 - Fix CRLF platform-dependent, Pipeline support,
+                      IRedisDataReader spostato in Redis.Transport.Intf
 -----------------------------------------------------------------------------}
 
 unit Redis.Protocol;
@@ -24,7 +33,7 @@ uses
   System.SysUtils, System.Classes, System.Generics.Collections,
   Redis.Types,
   Redis.Response,
-  Redis.Transport.Intf;   // IRedisDataReader, IRedisTransport
+  Redis.Transport.Intf;
 
 type
   // ---------------------------------------------------------------------------
@@ -42,13 +51,11 @@ type
   public
     constructor Create(aReader: IRedisDataReader);
     function Parse: IRedisResponse;
-    // Legge N risposte consecutive (usato dal flush pipeline)
     function ParseMultiple(aCount: Integer): TArray<IRedisResponse>;
   end;
 
   // ---------------------------------------------------------------------------
   // Serializzatore comandi Redis
-  // Usa sempre RESP_CRLF (#13#10) — mai sLineBreak
   // ---------------------------------------------------------------------------
   TRedisCommandSerializer = class(TObject)
   public
@@ -71,13 +78,14 @@ begin
 end;
 
 function TRedisProtocolParser.Parse: IRedisResponse;
+var
+  lDataType: TRedisDataType;
 begin
   var lLine := FReader.ReadLine;
   if Length(lLine) = 0 then
     raise ERedisProtocolException.Create('Risposta vuota dal server');
 
   var lFirstChar := lLine[1];
-  var lDataType := TRedisDataType.rdtNone;
   lDataType := lDataType.FromChar(lFirstChar);
 
   case lDataType of
@@ -133,14 +141,14 @@ begin
 
   if lSize = 0 then
   begin
-    FReader.ReadLine;  // consuma CRLF finale
+    FReader.ReadLine;
     Result := TRedisResponseBuilder.CreateBulkString('');
     Exit;
   end;
 
   lData := FReader.ReadBytes(lSize);
   var lStrValue := TEncoding.UTF8.GetString(lData);
-  FReader.ReadLine;  // consuma CRLF finale
+  FReader.ReadLine;
 
   Result := TRedisResponseBuilder.CreateBulkString(lStrValue);
 end;
@@ -195,7 +203,6 @@ var
   lCount: string;
   lSize: string;
 begin
-  // IMPORTANTE: usa RESP_CRLF (#13#10) fisso, NON sLineBreak
   var lCRLF := TEncoding.ASCII.GetBytes(RESP_CRLF);
 
   var lStream := TMemoryStream.Create;

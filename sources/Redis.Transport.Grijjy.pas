@@ -86,16 +86,12 @@ type
     { Event handlers Grijjy }
     procedure OnSocketConnected;
     procedure OnSocketDisconnected;
-    procedure OnSocketRecv(const ABuffer: Pointer; const ASize: Integer);
-    
+    procedure OnSocketRecv(const aBuffer: Pointer; const aSize: Integer);
+
     function  ReadRawLine: string;
     function  ReadByteFromBuffer: Byte;
   private
     constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger); reintroduce;
-  public
-    destructor Destroy; override;
-
-    class function New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger): IRedisTransport;
 
     { IRedisTransport }
     procedure Connect;
@@ -110,6 +106,9 @@ type
     { IRedisDataReader }
     function ReadLine: string;
     function ReadBytes(aCount: Integer): TBytes;
+  public
+    destructor Destroy; override;
+    class function New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger): IRedisTransport;
   end;
 
 implementation
@@ -139,8 +138,7 @@ begin
   FPipelineCount := 0;
   FPipelineBuffer := TMemoryStream.Create;
 
-  // Buffer di lettura iniziale 64KB
-  SetLength(FReadBuffer, 65536);
+  SetLength(FReadBuffer, 0);
   FReadEvent := TEvent.Create(nil, False, False, '');
   FReadLock := TCriticalSection.Create;
 
@@ -206,58 +204,50 @@ procedure TRedisGrijjyTransport.OnSocketDisconnected;
 begin
   FConnected := False;
   Log('Socket Grijjy disconnesso');
-  FReadEvent.SetEvent; // Sveglia il reader in caso di timeout
+  FReadEvent.SetEvent;
 end;
 
-procedure TRedisGrijjyTransport.OnSocketRecv(const ABuffer: Pointer; const ASize: Integer);
+procedure TRedisGrijjyTransport.OnSocketRecv(const aBuffer: Pointer; const aSize: Integer);
+var
+  lCurrentSize: Integer;
+  lNewSize: Integer;
 begin
-  if ASize <= 0 then
+  if aSize <= 0 then
     Exit;
 
   FReadLock.Enter;
   try
-    var lCurrentSize := Length(FReadBuffer);
-    var lNewSize := lCurrentSize + ASize;
-    
-    // Aumenta il buffer se necessario (raddoppia la dimensione)
-    if lNewSize > Length(FReadBuffer) then
-      SetLength(FReadBuffer, lNewSize + (lNewSize shr 1)); // +50%
-
-    // Copia i dati in coda al buffer
-    Move(ABuffer^, FReadBuffer[lCurrentSize], ASize);
+    lCurrentSize := Length(FReadBuffer);
+    lNewSize := lCurrentSize + aSize;
+    SetLength(FReadBuffer, lNewSize);
+    Move(aBuffer^, FReadBuffer[lCurrentSize], aSize);
   finally
     FReadLock.Leave;
-    FReadEvent.SetEvent; // Segnala che dati sono disponibili
   end;
+
+  FReadEvent.SetEvent;
 end;
 
 procedure TRedisGrijjyTransport.InternalConnect;
 begin
   try
-    // Richiedi una connessione dal manager
     FSocket := FManager.Request(FConfig.Host, FConfig.Port);
 
     if FSocket = nil then
       raise ERedisConnectionException.Create('Impossibile ottenere socket dal manager');
 
-    // Registra i callback
     FSocket.OnConnected := OnSocketConnected;
     FSocket.OnDisconnected := OnSocketDisconnected;
     FSocket.OnRecv := OnSocketRecv;
-
-    // Configura SSL se necessario
     if FConfig.UseSSL then
       SetupSSL;
 
-    // Connetti il socket
     if not FSocket.Connect then
       raise ERedisConnectionException.Create('Errore connessione socket Grijjy');
 
-    // Attendi la connessione con timeout
     var lStart := Now;
     var lTimeoutSeconds := FConfig.ConnectionTimeout / 1000;
-    while (FSocket.State <> TgoConnectionState.Connected) and 
-          (SecondsBetween(Now, lStart) < lTimeoutSeconds) do
+    while (FSocket.State <> TgoConnectionState.Connected) and (SecondsBetween(Now, lStart) < lTimeoutSeconds) do
       Sleep(10);
 
     if FSocket.State <> TgoConnectionState.Connected then
@@ -519,28 +509,37 @@ end;
 
 function TRedisGrijjyTransport.ReadByteFromBuffer: Byte;
 begin
-  FReadLock.Enter;
-  try
-    // Se il buffer è vuoto, attendi nuovi dati
-    if Length(FReadBuffer) = 0 then
-    begin
+  while True do
+  begin
+    FReadLock.Enter;
+    try
+      if Length(FReadBuffer) > 0 then
+      begin
+        Result := FReadBuffer[0];
+        if Length(FReadBuffer) > 1 then
+          Move(FReadBuffer[1], FReadBuffer[0], Length(FReadBuffer) - 1);
+        SetLength(FReadBuffer, Length(FReadBuffer) - 1);
+        Exit;
+      end;
+    finally
       FReadLock.Leave;
-      // Attendi con timeout
-      if FReadEvent.WaitFor(FConfig.ReadTimeout) = wrTimeout then
-        raise ERedisTimeoutException.Create('Timeout lettura dati dal server Redis');
-      FReadLock.Enter;
     end;
-    
-    if Length(FReadBuffer) = 0 then
-      raise ERedisConnectionException.Create('Connessione chiusa dal server');
 
-    Result := FReadBuffer[0];
-    // Rimuovi il primo byte dal buffer
-    if Length(FReadBuffer) > 1 then
-      Move(FReadBuffer[1], FReadBuffer[0], Length(FReadBuffer) - 1);
-    SetLength(FReadBuffer, Length(FReadBuffer) - 1);
-  finally
-    FReadLock.Leave;
+    FReadEvent.ResetEvent;
+
+    FReadLock.Enter;
+    try
+      if Length(FReadBuffer) > 0 then
+        Continue;
+    finally
+      FReadLock.Leave;
+    end;
+
+    if FReadEvent.WaitFor(FConfig.ReadTimeout) = wrTimeout then
+      raise ERedisTimeoutException.Create('Timeout lettura dati dal server Redis');
+
+    if not FConnected then
+      raise ERedisConnectionException.Create('Connessione chiusa dal server durante lettura');
   end;
 end;
 
@@ -555,22 +554,18 @@ begin
   lCount := 0;
   lPrevByte := 0;
 
-  // Leggi byte per byte fino a trovare CRLF
   while True do
   begin
     lByte := ReadByteFromBuffer;
 
-    // Aumenta il buffer se necessario
     if lCount >= Length(lLine) then
       SetLength(lLine, Length(lLine) + 256);
 
     lLine[lCount] := lByte;
     Inc(lCount);
 
-    // Controlla CRLF (#13#10)
     if (lPrevByte = 13) and (lByte = 10) then
     begin
-      // Rimuovi CRLF dalla fine
       Dec(lCount, 2);
       Break;
     end;
@@ -578,7 +573,6 @@ begin
     lPrevByte := lByte;
   end;
 
-  // Converti in stringa
   SetLength(lLine, lCount);
   Result := TEncoding.UTF8.GetString(lLine);
 end;
@@ -624,7 +618,7 @@ begin
       try
         var lAvailable := Length(FReadBuffer);
         var lChunk := aCount - lRead;
-        
+
         if lChunk > lAvailable then
           lChunk := lAvailable;
 
@@ -640,7 +634,6 @@ begin
         FReadLock.Leave;
       end;
 
-      // Se non abbiamo abbastanza dati, attendi
       if lRead < aCount then
       begin
         if FReadEvent.WaitFor(FConfig.ReadTimeout) = wrTimeout then

@@ -20,7 +20,7 @@
  Info:
    Interfaccia unificata per il trasporto Redis.
    Sostituisce sia IRedisTransport (too thin) sia IRedisSynapseTransport
-   (too coupled to Synapse). Tutti i transport (Synapse, Native, ecc.)
+   (too coupled to Synapse). Tutti i transport (Synapse, Grijjy, ecc.)
    implementano questa interfaccia.
 
    IRedisDataReader è mantenuto per retrocompatibilità col TRedisProtocolParser.

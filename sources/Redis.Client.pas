@@ -4,9 +4,25 @@
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio
  Date:      14-dic-2025
- Updated:   2026 - Migrazione a IRedisTransport (provider-agnostico),
-                   New() accetta provider string, costruttore aggiornato,
-                   rimossa dipendenza diretta da Redis.Transport.Synapse
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+
+ Info:
+ Purpose:
+ History:
+  - Updated:   2026 - Migrazione a IRedisTransport (provider-agnostico),
+                      New() accetta provider string, costruttore aggiornato,
+                      rimossa dipendenza diretta da Redis.Transport.Synapse
 -----------------------------------------------------------------------------}
 
 unit Redis.Client;
@@ -27,7 +43,7 @@ uses
 type
   TRedisClient = class(TInterfacedObject, IRedisClient)
   strict private
-    FTransport: IRedisTransport;  // interfaccia generica — nessun accoppiamento al transport
+    FTransport: IRedisTransport;
     FParser: TRedisProtocolParser;
     FConfig: TRedisConnectionConfig;
     FInTransaction: Boolean;
@@ -194,14 +210,13 @@ type
 
     function  ExecuteCommand(const aParts: array of string): IRedisResponse;
 
-    // Costruttore privato: accetta un transport già costruito
     constructor Create(const aConfig: TRedisConnectionConfig; const aTransport: IRedisTransport; aLogger: IRedisLogger = nil); reintroduce;
   public
     destructor Destroy; override;
 
     /// Crea un client usando il provider di trasporto specificato.
     /// aProvider: 'synapse' (default) oppure 'native'
-    /// Per usare 'native' includi Redis.Transport.Native nel progetto.
+    /// Per usare 'grijjy' includi Redis.Transport.Grijjy nel progetto.
     class function New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; const aProvider:  string = 'synapse'): IRedisClient;
   end;
 
@@ -408,13 +423,14 @@ begin
     end;
   end;
 
-  Result.IsHealthy    := True;
+  Result.IsHealthy := True;
   Result.ErrorMessage := 'OK';
 end;
 
 procedure TRedisClient.LogHealthStatus;
 begin
-  if not Assigned(FLogger) then Exit;
+  if not Assigned(FLogger) then
+    Exit;
   var lH := HealthCheckDetailed;
   FLogger.LogInfo('=== Redis Health Check ===');
   FLogger.LogInfo(lH.ToString);
@@ -521,10 +537,11 @@ begin
   var lCmd := TList<string>.Create;
   try
     lCmd.Add('MSETNX');
-    for var S in aPairs do lCmd.Add(S);
+    for var S in aPairs do
+      lCmd.Add(S);
       Result := ExecuteAndParse(lCmd.ToArray).AsInteger = 1;
-  finally 
-    lCmd.Free; 
+  finally
+    lCmd.Free;
   end;
 end;
 
@@ -533,10 +550,12 @@ begin
   ValidateKeys(aKeys);
   var lCmd := TList<string>.Create;
   try
-    lCmd.Add('DEL'); for var K in aKeys do lCmd.Add(K);
+    lCmd.Add('DEL');
+    for var K in aKeys do
+      lCmd.Add(K);
     Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
-  finally 
-    lCmd.Free; 
+  finally
+    lCmd.Free;
   end;
 end;
 
@@ -545,10 +564,12 @@ begin
   ValidateKeys(aKeys);
   var lCmd := TList<string>.Create;
   try
-    lCmd.Add('UNLINK'); for var K in aKeys do lCmd.Add(K);
+    lCmd.Add('UNLINK');
+    for var K in aKeys do
+      lCmd.Add(K);
     Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
-  finally 
-    lCmd.Free; 
+  finally
+    lCmd.Free;
   end;
 end;
 
@@ -557,27 +578,29 @@ begin
   ValidateKeys(aKeys);
   var lCmd := TList<string>.Create;
   try
-    lCmd.Add('EXISTS'); for var K in aKeys do lCmd.Add(K);
+    lCmd.Add('EXISTS');
+    for var K in aKeys do
+      lCmd.Add(K);
     Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
-  finally 
-    lCmd.Free; 
+  finally
+    lCmd.Free;
   end;
 end;
 
 function TRedisClient.Expire(const aKey: string; aSeconds: Integer): Boolean;
-begin 
-  ValidateKey(aKey); 
-  Result := ExecuteAndParse(['EXPIRE', aKey, IntToStr(aSeconds)]).AsInteger = 1; 
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['EXPIRE', aKey, IntToStr(aSeconds)]).AsInteger = 1;
 end;
 
 function TRedisClient.PExpire(const aKey: string; aMilliseconds: Int64): Boolean;
-begin 
-  ValidateKey(aKey); 
-  Result := ExecuteAndParse(['PEXPIRE', aKey, IntToStr(aMilliseconds)]).AsInteger = 1; 
+begin
+  ValidateKey(aKey);
+  Result := ExecuteAndParse(['PEXPIRE', aKey, IntToStr(aMilliseconds)]).AsInteger = 1;
 end;
 
 function TRedisClient.ExpireAt(const aKey: string; aUnixTimestamp: Int64): Boolean;
-begin 
+begin
   ValidateKey(aKey); 
   Result := ExecuteAndParse(['EXPIREAT', aKey, IntToStr(aUnixTimestamp)]).AsInteger = 1; 
 end;
@@ -667,15 +690,15 @@ function TRedisClient.Scan(aCursor: Int64; const aPattern: string; aCount: Integ
 begin
   var lCmd := TList<string>.Create;
   try
-    lCmd.Add('SCAN'); lCmd.Add(IntToStr(aCursor));
-    if aPattern <> '' then 
-    begin 
-      lCmd.Add('MATCH'); lCmd.Add(aPattern); 
-    end;
-    if aCount > 0 then 
-    begin 
-      lCmd.Add('COUNT'); lCmd.Add(IntToStr(aCount)); 
-    end;
+    lCmd.Add('SCAN');
+    lCmd.Add(IntToStr(aCursor));
+
+    if aPattern <> '' then
+      lCmd.Add('MATCH'); lCmd.Add(aPattern);
+
+    if aCount > 0 then
+      lCmd.Add('COUNT'); lCmd.Add(IntToStr(aCount));
+
     Result := ParseScanResponse(ExecuteAndParse(lCmd.ToArray));
   finally 
     lCmd.Free; 

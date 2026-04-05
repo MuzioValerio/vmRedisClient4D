@@ -194,7 +194,7 @@ begin
   FConfig.ConnectionTimeout := 5000;
   FConfig.ReadTimeout := 5000;
   
-  FClient := TRedisClient.New(FConfig);
+  FClient := TRedisClient.New(FConfig, nil, 'grijjy');
   FClient.Connect;
   
   // Pulizia chiavi di test precedenti
@@ -476,6 +476,7 @@ const
   PREFIX = 'test:scan:';
 var
   lKeys: TArray<string>;
+  lScanRes: TRedisScanResult;
   I: Integer;
 begin
   // Crea alcune chiavi
@@ -483,7 +484,8 @@ begin
     FClient.SetValue(PREFIX + IntToStr(I), 'value' + IntToStr(I));
 
   // SCAN con pattern
-  lKeys := FClient.Scan(0, PREFIX + '*', 100);
+  lScanRes := FClient.Scan(0, PREFIX + '*', 100);
+  lKeys := lScanRes.Items;
   Assert.IsTrue(Length(lKeys) >= 5, 'SCAN dovrebbe trovare almeno 5 chiavi');
 
   // Cleanup
@@ -779,12 +781,14 @@ const
   TEST_KEY = 'test:sscan:set';
 var
   lMembers: TArray<string>;
+  lScanRes: TRedisScanResult;
 begin
   // Aggiungi membri
   for var I := 1 to 10 do
     FClient.SAdd(TEST_KEY, ['member' + IntToStr(I)]);
 
-  lMembers := FClient.SScan(TEST_KEY, 0, 'member*', 100);
+  lScanRes := FClient.SScan(TEST_KEY, 0, 'member*', 100);
+  lMembers := lScanRes.Items;
   Assert.IsTrue(Length(lMembers) >= 10, 'SSCAN dovrebbe trovare tutti i membri');
 
   // Cleanup
@@ -921,11 +925,13 @@ const
 var
   lFields: TArray<string>;
   I: Integer;
+  lScanRes: TRedisScanResult;
 begin
   for I := 1 to 10 do
     FClient.HSet(TEST_KEY, 'field' + IntToStr(I), 'value' + IntToStr(I));
 
-  lFields := FClient.HScan(TEST_KEY, 0, 'field*', 100);
+  lScanRes := FClient.HScan(TEST_KEY, 0, 'field*', 100);
+  lFields := lScanRes.Items;
   Assert.IsTrue(Length(lFields) >= 10, 'HSCAN dovrebbe trovare tutti i campi');
 
   // Cleanup
@@ -1026,11 +1032,13 @@ const
   TEST_KEY = 'test:zscan:zset';
 var
   lMembers: TArray<string>;
+  lScanRes: TRedisScanResult;
 begin
   for var I := 1 to 10 do
     FClient.ZAdd(TEST_KEY, I * 1.0, 'member' + IntToStr(I));
 
-  lMembers := FClient.ZScan(TEST_KEY, 0, 'member*', 100);
+  lScanRes := FClient.ZScan(TEST_KEY, 0, 'member*', 100);
+  lMembers := lScanRes.Items;
   Assert.IsTrue(Length(lMembers) >= 10, 'ZSCAN dovrebbe trovare tutti i membri');
 
   // Cleanup

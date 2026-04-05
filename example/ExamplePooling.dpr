@@ -43,7 +43,7 @@ begin
   lRedisConfig.Port := 6379;
 
   // Crea pool
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig);
+  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
   lPool.Initialize;
   try
     WriteLn('Pool inizializzato con successo');
@@ -63,7 +63,7 @@ var
 begin
   WriteLn('=== Esempio 2: Acquire/Release Manuale ===');
 
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig);
+  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
   lPool.Initialize;
   try
     // Acquisisce la connessione
@@ -94,7 +94,7 @@ var
 begin
   WriteLn('=== Esempio 3: Con Helper ===');
 
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig);
+  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
   lPool.Initialize;
   try
     // Eseguo operazione con gestione automatica
@@ -142,7 +142,7 @@ var
 begin
   WriteLn('=== Esempio 4: Con Record (Auto-release) ===');
 
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig);
+  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
   lPool.Initialize;
   try
     // Il record gestisce automaticamente acquire/release
@@ -181,7 +181,7 @@ begin
   WriteLn('=== Esempio 5: Operazioni Concorrenti ===');
 
   // Pool con più connessioni per gestire concorrenza
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig);
+  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
   lPool.Initialize;
   try
     WriteLn('Avvio 5 thread...');
@@ -256,7 +256,7 @@ var
 begin
   WriteLn('=== Esempio 6: Monitoraggio ===');
 
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig);
+  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
   lPool.Initialize;
   try
     // Esegue alcune operazioni
@@ -296,7 +296,7 @@ var
 begin
   WriteLn('=== Esempio 7: Gestione Errori ===');
 
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig);
+  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
   lPool.Initialize;
   try
     try
@@ -383,7 +383,7 @@ begin
   lPoolConfig.MaxConnections := 10;
   lPoolConfig.AcquireTimeout := 5000;
 
-  lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig);
+  lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
   lPool.Initialize;
 
   try

@@ -154,8 +154,8 @@
         <DCCReference Include="Redis.Client.Tests.pas"/>
         <DCCReference Include="Redis.Pool.Tests.pas"/>
         <DCCReference Include="Redis.PubSub.Tests.pas"/>
-        <DCCReference Include="..\sources\Redis.Client.pas"/>
         <DCCReference Include="..\sources\Redis.Client.Intf.pas"/>
+        <DCCReference Include="..\sources\Redis.Client.pas"/>
         <DCCReference Include="..\sources\Redis.Connection.Config.pas"/>
         <DCCReference Include="..\sources\Redis.HealthCheck.pas"/>
         <DCCReference Include="..\sources\Redis.Logger.Empty.pas"/>
@@ -163,8 +163,8 @@
         <DCCReference Include="..\sources\Redis.Protocol.pas"/>
         <DCCReference Include="..\sources\Redis.PubSub.pas"/>
         <DCCReference Include="..\sources\Redis.Response.pas"/>
+        <DCCReference Include="..\sources\Redis.Transport.Grijjy.pas"/>
         <DCCReference Include="..\sources\Redis.Transport.Intf.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Native.pas"/>
         <DCCReference Include="..\sources\Redis.Transport.Registry.pas"/>
         <DCCReference Include="..\sources\Redis.Transport.Synapse.pas"/>
         <DCCReference Include="..\sources\Redis.Types.pas"/>

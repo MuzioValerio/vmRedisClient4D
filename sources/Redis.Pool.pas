@@ -100,7 +100,8 @@ type
     function GetIsHealthy: Boolean;
     function GetIdleTimeMs: Int64;
   public
-    constructor Create(aPool: TRedisConnectionPool; const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger); reintroduce;
+    constructor Create(aPool: TRedisConnectionPool; const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger; aTransport: string = 'synapse');
+        reintroduce;
     destructor Destroy; override;
 
     procedure MarkAsUsed;
@@ -155,6 +156,7 @@ type
     FStats: TRedisPoolStats;
     FInitialized: Boolean;
     FShutdown: Boolean;
+    FTransport: string;
 
     function CreateConnection: TPooledConnection;
     procedure DestroyConnection(aConnection: TPooledConnection);
@@ -175,11 +177,13 @@ type
     function GetStats: TRedisPoolStats;
     procedure LogStats;
     function GetConfig: TRedisPoolConfig;
+
+    constructor Create(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; aTransport: string =
+        'synapse'); reintroduce;
   public
-    constructor Create(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil); reintroduce;
     destructor Destroy; override;
-    class function New(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil):
-        IRedisConnectionPool;
+    class function New(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; aTransport: string =
+        'synapse'): IRedisConnectionPool;
   end;
 
   // ============================================================================
@@ -213,7 +217,7 @@ type
   // ============================================================================
   TRedisThreadHelper = class
   public
-    /// Esegue aIterations operazioni su una connessione dal pool in un thread worker.
+    /// Esegue n operazioni su una connessione dal pool in un thread worker.
     /// Utile per test di carico e verifica della thread-safety del pool.
     class procedure WorkerThread(aPool: IRedisConnectionPool; aThreadNum: Integer; aIterations: Integer = 10);
   end;
@@ -290,7 +294,8 @@ end;
 
 { TPooledConnection }
 
-constructor TPooledConnection.Create(aPool: TRedisConnectionPool; const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger);
+constructor TPooledConnection.Create(aPool: TRedisConnectionPool; const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger; aTransport: string =
+    'synapse');
 begin
   inherited Create;
   FPool := aPool;
@@ -303,7 +308,7 @@ begin
   FCurrentDb := aConfig.Database; // il db iniziale dalla config
   
   // Crea e connette il client Redis
-  FClient := TRedisClient.New(aConfig, aLogger); // provider default 'synapse'
+  FClient := TRedisClient.New(aConfig, aLogger, aTransport);
   FClient.Connect;
 end;
 
@@ -351,13 +356,11 @@ begin
 end;
 
 procedure TPooledConnection.EnsureDatabase(aDb: Integer);
-// FIX PRINCIPALE: garantisce che la connessione sia sul db corretto
-// prima di essere restituita a un nuovo consumer
 begin
   if aDb < 0 then // -1 = non importa il db
-    Exit;           
+    Exit;
   if FCurrentDb = aDb then // già sul db corretto
-    Exit;  
+    Exit;
 
   try
     FClient.Select(aDb);
@@ -439,13 +442,14 @@ end;
 
 { TRedisConnectionPool }
 
-class function TRedisConnectionPool.New(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger =
-    nil): IRedisConnectionPool;
+class function TRedisConnectionPool.New(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil;
+    aTransport: string = 'synapse'): IRedisConnectionPool;
 begin
   Result := TRedisConnectionPool.Create(aPoolConfig, aRedisConfig, aLogger);
 end;
 
-constructor TRedisConnectionPool.Create(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil);
+constructor TRedisConnectionPool.Create(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil;
+    aTransport: string = 'synapse');
 begin
   inherited Create;
 
@@ -456,6 +460,7 @@ begin
   FConfig := aPoolConfig;
   FRedisConfig := aRedisConfig;
   FLogger := aLogger;
+  FTransport := aTransport;
   FConnections := TObjectList<TPooledConnection>.Create(True); // OwnsObjects
   FLock := TCriticalSection.Create;
   FWaitingRequests := 0;
@@ -541,7 +546,7 @@ end;
 
 function TRedisConnectionPool.CreateConnection: TPooledConnection;
 begin
-  Result := TPooledConnection.Create(Self, FRedisConfig, FLogger);
+  Result := TPooledConnection.Create(Self, FRedisConfig, FLogger, FTransport);
 
   if Assigned(FLogger) then
     FLogger.LogDebug('Nuova connessione creata nel pool');
@@ -614,7 +619,7 @@ begin
           Inc(FStats.TotalErrors);
           if Assigned(FLogger) then
             FLogger.LogError('Errore creazione connessione minima: ' + E.Message);
-          Break; // Interrompo se non riesco a creare
+          Break;
         end;
       end;
     end;
@@ -631,16 +636,10 @@ begin
   for var I := FConnections.Count - 1 downto 0 do
   begin
     var Connection := FConnections[i];
-
-    // Non rimuovo le connessioni in uso
     if Connection.InUse then
       Continue;
-
-    // Non scendo sotto il minimo
     if FConnections.Count - RemovedCount <= FConfig.MinConnections then
       Break;
-
-    // Se non Healty, rimuovo
     if not Connection.IsHealthy then
     begin
       if Assigned(FLogger) then
@@ -650,8 +649,6 @@ begin
       Inc(FStats.TotalDestroyed);
       Inc(RemovedCount);
     end;
-
-    // Se idle troppo a lungo, rimuovo
     if Connection.IdleTimeMs > FConfig.IdleTimeout then
     begin
       if Assigned(FLogger) then
@@ -765,7 +762,6 @@ end;
 
 function TRedisConnectionPool.AcquireConnection: IRedisClient;
 begin
-  // Acquisisce sul database configurato di default (FRedisConfig.Database)
   Result := InternalAcquire(FRedisConfig.Database);
 end;
 
@@ -782,7 +778,6 @@ begin
   FLock.Enter;
   try
     var lFound := False;
-    // Trova la connessione che corrisponde al client
     for var lConn in FConnections do
       if lConn.Client = aClient then
       begin
@@ -797,7 +792,6 @@ begin
     if not lFound and Assigned(FLogger) then
       FLogger.LogWarning('Tentativo di rilasciare connessione non nel pool');
 
-    // Periodicamente pulisci connessioni idle
     CleanupIdleConnections;
   finally
     FLock.Leave;
@@ -807,7 +801,6 @@ end;
 procedure TRedisConnectionPool.UpdateAcquireTime(aTimeMs: Int64);
 begin
   var TotalAcquired := FStats.TotalAcquired + 1;
-  // Media mobile
   FStats.AverageAcquireTimeMs := (FStats.AverageAcquireTimeMs * (TotalAcquired - 1) + aTimeMs) / TotalAcquired;
 end;
 
@@ -880,7 +873,6 @@ class operator TPooledRedisClient.Finalize(var Dest: TPooledRedisClient);
 begin
   Dest.Release;
 end;
-
 
 constructor TPooledRedisClient.Create(aPool: IRedisConnectionPool);
 begin

@@ -19,7 +19,7 @@
 
  Info:
    Registro globale dei provider di trasporto Redis.
-   Ogni transport (Synapse, ecc.) si autoregistra nella sezione
+   Ogni transport (Synapse, Grijjy, ecc.) si autoregistra nella sezione
    initialization della propria unit.
 
    Utilizzo:

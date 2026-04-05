@@ -22,7 +22,7 @@
    Supporta RESP2 (RESP3 pronto per estensione futura).
  Purpose:
  History:
-  Updated: 2026 - Aggiornamento completo per Redis 8.x
+  - Updated: 2026 - Aggiornamento completo per Redis 8.x
 -----------------------------------------------------------------------------}
 
 unit Redis.Types;
@@ -146,7 +146,7 @@ type
 // Costanti
 // ---------------------------------------------------------------------------
 const
-  DEFAULT_REDIS_HOST = '127.0.0.1';
+  DEFAULT_REDIS_HOST = 'localhost';
   DEFAULT_REDIS_PORT = 6379;
   DEFAULT_CONNECTION_TIMEOUT = 5000;
   DEFAULT_READ_TIMEOUT = 30000;

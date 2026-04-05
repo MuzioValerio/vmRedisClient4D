@@ -17,8 +17,9 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 
- Updated:   2026 - Fix: New deve essere class function, non instance method
-                        LogDebug usa livello corretto
+ Info:
+ Purpose:
+ History:
 -----------------------------------------------------------------------------}
 
 unit Redis.HealthCheck;

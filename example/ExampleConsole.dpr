@@ -46,6 +46,9 @@ begin
   Response := lRedisClient.Get('chiave');
   Writeln(Response.AsString);
 
+  Response := lRedisClient.GetDel('chiave');
+  Writeln(Response.AsString);
+
   lRedisClient.Disconnect;
   if not lRedisClient.IsConnected then
     Writeln('disconnesso');

@@ -119,9 +119,9 @@ begin
   FConfig.ConnectionTimeout := 5000;
   FConfig.ReadTimeout := 5000;
   
-  FPublisher := TRedisPubSubPublisher.Create(FConfig);
-  FSubscriber := TRedisPubSubClient.Create(FConfig);
-  
+  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'grijjy');
+  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'grijjy');
+
   FReceivedMessages := TList<TRedisPubSubMessage>.Create;
   FSystemMessages := TList<TRedisPubSubMessage>.Create;
   FMessageLock := TCriticalSection.Create;

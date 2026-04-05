@@ -6,13 +6,13 @@
         <Projects Include="ExampleConsole.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="ExampleHealthCheck.dproj">
+            <Dependencies/>
+        </Projects>
         <Projects Include="ExamplePubSub.dproj">
             <Dependencies/>
         </Projects>
         <Projects Include="ExamplePooling.dproj">
-            <Dependencies/>
-        </Projects>
-        <Projects Include="ExampleHealthCheck.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -32,6 +32,15 @@
     <Target Name="ExampleConsole:Make">
         <MSBuild Projects="ExampleConsole.dproj" Targets="Make"/>
     </Target>
+    <Target Name="ExampleHealthCheck">
+        <MSBuild Projects="ExampleHealthCheck.dproj"/>
+    </Target>
+    <Target Name="ExampleHealthCheck:Clean">
+        <MSBuild Projects="ExampleHealthCheck.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ExampleHealthCheck:Make">
+        <MSBuild Projects="ExampleHealthCheck.dproj" Targets="Make"/>
+    </Target>
     <Target Name="ExamplePubSub">
         <MSBuild Projects="ExamplePubSub.dproj"/>
     </Target>
@@ -50,23 +59,14 @@
     <Target Name="ExamplePooling:Make">
         <MSBuild Projects="ExamplePooling.dproj" Targets="Make"/>
     </Target>
-    <Target Name="ExampleHealthCheck">
-        <MSBuild Projects="ExampleHealthCheck.dproj"/>
-    </Target>
-    <Target Name="ExampleHealthCheck:Clean">
-        <MSBuild Projects="ExampleHealthCheck.dproj" Targets="Clean"/>
-    </Target>
-    <Target Name="ExampleHealthCheck:Make">
-        <MSBuild Projects="ExampleHealthCheck.dproj" Targets="Make"/>
-    </Target>
     <Target Name="Build">
-        <CallTarget Targets="ExampleConsole;ExamplePubSub;ExamplePooling;ExampleHealthCheck"/>
+        <CallTarget Targets="ExampleConsole;ExampleHealthCheck;ExamplePubSub;ExamplePooling"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="ExampleConsole:Clean;ExamplePubSub:Clean;ExamplePooling:Clean;ExampleHealthCheck:Clean"/>
+        <CallTarget Targets="ExampleConsole:Clean;ExampleHealthCheck:Clean;ExamplePubSub:Clean;ExamplePooling:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="ExampleConsole:Make;ExamplePubSub:Make;ExamplePooling:Make;ExampleHealthCheck:Make"/>
+        <CallTarget Targets="ExampleConsole:Make;ExampleHealthCheck:Make;ExamplePubSub:Make;ExamplePooling:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

@@ -16,6 +16,7 @@ uses
   Redis.Protocol in '..\sources\Redis.Protocol.pas',
   Redis.PubSub in '..\sources\Redis.PubSub.pas',
   Redis.Response in '..\sources\Redis.Response.pas',
+  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas',
   Redis.Transport.Intf in '..\sources\Redis.Transport.Intf.pas',
   Redis.Transport.Registry in '..\sources\Redis.Transport.Registry.pas',
   Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas',
@@ -34,7 +35,7 @@ begin
   lConfig.ConnectionTimeout := 5000;
   lConfig.ReadTimeout := 30000;
 
-  lRedisClient := TRedisClient.New(lConfig);
+  lRedisClient := TRedisClient.New(lConfig, nil, 'grijjy');
   lRedisClient.Connect;
   try
     // Operazioni normali
@@ -62,7 +63,7 @@ begin
   lConfig.ReadTimeout := 30000;
 
   // Client principale per le operazioni normali
-  var lMainClient := TRedisClient.New(lConfig);
+  var lMainClient := TRedisClient.New(lConfig, nil, 'grijjy');
   lMainClient.Connect;
 
   // Publisher dedicato
@@ -120,7 +121,7 @@ type
     FListenerThread: TRedisPubSubListenerThread;
     FLogger: IRedisLogger;
   public
-    constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil); reintroduce;
+    constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; aTransport: string = 'synapse'); reintroduce;
     destructor Destroy; override;
 
     // Operazioni normali
@@ -133,14 +134,13 @@ type
     procedure StopEventListening;
   end;
 
-constructor TRedisEventManager.Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil);
+constructor TRedisEventManager.Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; aTransport: string = 'synapse');
 begin
   inherited Create;
   FConfig := aConfig;
   FLogger := aLogger;
 
-  // Creo e connetto i client
-  FMainClient := TRedisClient.New(FConfig, FLogger);
+  FMainClient := TRedisClient.New(FConfig, FLogger, aTransport);
   FMainClient.Connect;
 
   FPublisher := FMainClient.CreatePublisher;
@@ -209,7 +209,6 @@ begin
   end;
 end;
 
-// Uso dell'Event lManager
 procedure UseEventManager;
 var
   lConfig: TRedisConnectionConfig;
@@ -219,30 +218,25 @@ begin
   lConfig.ConnectionTimeout := 5000;
   lConfig.ReadTimeout := 30000;
 
-  var lManager := TRedisEventManager.Create(lConfig);
+  var lManager := TRedisEventManager.Create(lConfig, nil, 'grijjy');
   try
-    // Avvia ascolto eventi
     lManager.StartEventListening(
       procedure(const Msg: TRedisPubSubMessage)
       begin
         Writeln(Format('Event: %s - %s', [Msg.Channel, Msg.Payload]));
 
-        // Gestisco eventi specifici
         if Msg.Channel = 'user.login' then
           Writeln('User logged in!')
         else if Msg.Channel = 'system.error' then
           Writeln('ERROR: ' + Msg.Payload);
       end);
 
-    // Lavoro con i dati
     lManager.SaveData('user:john', 'John Doe');
     Writeln('Loaded: ' + lManager.LoadData('user:john'));
 
-    // Pubblico eventi
     lManager.PublishEvent('user.login', 'john');
     lManager.PublishEvent('system.error', 'Connection timeout');
 
-    // Attendo
     Sleep(10000);
   finally
     lManager.Free;
