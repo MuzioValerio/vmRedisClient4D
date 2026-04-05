@@ -26,11 +26,35 @@ uses
 var
   Response: IRedisResponse;
 
+procedure esempio_1;
+var
+  lConfig: TRedisConnectionConfig;
+begin
+  writeln(lConfig.Host);
+  Writeln(lConfig.Port);
 
+  var lRedisClient := TRedisClient.New(lConfig, nil, 'grijjy');
+
+  lRedisClient.Connect;
+  if lRedisClient.IsConnected then
+    Writeln('connesso')
+  else
+    Writeln('connessione non riuscita');
+
+  // Operazioni base
+  lRedisClient.SetValue('chiave', 'valore');
+  Response := lRedisClient.Get('chiave');
+  Writeln(Response.AsString);
+
+  lRedisClient.Disconnect;
+  if not lRedisClient.IsConnected then
+    Writeln('disconnesso');
+  Readln;
+end;
 
 begin
   try
-    ;
+    esempio_1;
   except
     on E: Exception do
       Writeln(E.ClassName, ': ', E.Message);
