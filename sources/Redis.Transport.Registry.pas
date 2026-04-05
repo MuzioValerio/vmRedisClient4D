@@ -19,20 +19,20 @@
 
  Info:
    Registro globale dei provider di trasporto Redis.
-   Ogni transport (Synapse, Native, ecc.) si autoregistra nella sezione
+   Ogni transport (Synapse, ecc.) si autoregistra nella sezione
    initialization della propria unit.
 
    Utilizzo:
      // Nella unit del transport:
      initialization
-       TRedisTransportRegistry.RegisterProvider('native',
+       TRedisTransportRegistry.RegisterProvider('synapse',
          function(const Config: TRedisConnectionConfig; const Logger: IRedisLogger): IRedisTransport
          begin
            Result := TRedisNativeTransport.Create(Config, Logger);
          end);
 
      // Per ottenere un transport:
-     var Transport := TRedisTransportRegistry.Acquire('native', Config, Logger);
+     var Transport := TRedisTransportRegistry.Acquire('synapse', Config, Logger);
 -----------------------------------------------------------------------------}
 
 unit Redis.Transport.Registry;

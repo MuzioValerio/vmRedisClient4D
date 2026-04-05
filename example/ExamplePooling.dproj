@@ -4,7 +4,7 @@
         <ProjectVersion>20.1</ProjectVersion>
         <FrameworkType>None</FrameworkType>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">Release</Config>
+        <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <ProjectName Condition="'$(ProjectName)'==''">ExamplePooling</ProjectName>
         <TargetedPlatforms>1</TargetedPlatforms>
@@ -180,16 +180,20 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="..\Versione 2.0\Redis.Client.Intf.pas"/>
-        <DCCReference Include="..\Versione 2.0\Redis.Client.pas"/>
-        <DCCReference Include="..\Versione 2.0\Redis.HealthCheck.pas"/>
-        <DCCReference Include="..\Versione 2.0\Redis.Pool.pas"/>
-        <DCCReference Include="..\Versione 2.0\Redis.Protocol.pas"/>
-        <DCCReference Include="..\Versione 2.0\Redis.Transport.Synapse.pas"/>
-        <DCCReference Include="..\Versione 2.0\Redis.Types.pas"/>
-        <DCCReference Include="..\Redis.Response.pas"/>
-        <DCCReference Include="..\Redis.Connection.Config.pas"/>
-        <DCCReference Include="..\Redis.PubSub.pas"/>
+        <DCCReference Include="..\sources\Redis.Client.Intf.pas"/>
+        <DCCReference Include="..\sources\Redis.Client.pas"/>
+        <DCCReference Include="..\sources\Redis.Connection.Config.pas"/>
+        <DCCReference Include="..\sources\Redis.HealthCheck.pas"/>
+        <DCCReference Include="..\sources\Redis.Logger.Empty.pas"/>
+        <DCCReference Include="..\sources\Redis.Pool.pas"/>
+        <DCCReference Include="..\sources\Redis.Protocol.pas"/>
+        <DCCReference Include="..\sources\Redis.PubSub.pas"/>
+        <DCCReference Include="..\sources\Redis.Response.pas"/>
+        <DCCReference Include="..\sources\Redis.Transport.Intf.pas"/>
+        <DCCReference Include="..\sources\Redis.Transport.Registry.pas"/>
+        <DCCReference Include="..\sources\Redis.Transport.Synapse.pas"/>
+        <DCCReference Include="..\sources\Redis.Types.pas"/>
+        <DCCReference Include="..\sources\Redis.Transport.Grijjy.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -228,6 +232,12 @@
                     </Platform>
                 </DeployFile>
                 <DeployFile LocalName="Win32\Debug\ExamplePooling.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>ExamplePooling.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="Win32\Release\ExamplePooling.exe" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>ExamplePooling.exe</RemoteName>
                         <Overwrite>true</Overwrite>

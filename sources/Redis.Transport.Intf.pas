@@ -31,7 +31,9 @@ unit Redis.Transport.Intf;
 interface
 
 uses
-  System.Classes, System.SysUtils, Redis.Connection.Config;
+  System.Classes, System.SysUtils,
+  Redis.Connection.Config,
+  Redis.Types;
 
 type
   // Lettura dati grezzi — usata dal TRedisProtocolParser
@@ -67,7 +69,7 @@ type
   IRedisSynapseTransport = IRedisTransport;
 
   // Tipo del factory method usato dal Registry
-  TTransportActivator = reference to function(const aConfig: TRedisConnectionConfig; const aLogger: IInterface): IRedisTransport;
+  TTransportActivator = reference to function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport;
 
 implementation
 

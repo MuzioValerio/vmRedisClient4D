@@ -1,4 +1,4 @@
-ï»¿{-----------------------------------------------------------------------------
+{-----------------------------------------------------------------------------
  Project: vmRedisClient
  Unit Name: Redis.Transport.Native
  Copyright (C) 2025-2026 Muzio Valerio
@@ -27,6 +27,11 @@
    Autoregistrazione nella sezione initialization con ID = 'native'.
    Per usarlo:
      TRedisClient.New(Config, Logger, 'native');
+
+ Purpose:
+ History:
+ - Updated:   2026 - Rimossi tutti gli if Assigned(FLogger): il Registry
+                     garantisce sempre un logger valido (reale o Empty).
 -----------------------------------------------------------------------------}
 
 unit Redis.Transport.Native;
@@ -45,42 +50,43 @@ uses
 type
   TRedisNativeTransport = class(TInterfacedObject, IRedisTransport)
   strict private
-    FConfig:    TRedisConnectionConfig;
-    FLogger:    IRedisLogger;
-    FSocket:    TSocket;
+    FConfig: TRedisConnectionConfig;
+    FLogger: IRedisLogger;
+    FSocket: TSocket;
 
     // Buffer di lettura a blocchi per efficienza
     FReadBuffer: TBytes;
-    FBufferPos:  Integer;
-    FBufferLen:  Integer;
+    FBufferPos: Integer;
+    FBufferLen: Integer;
 
     // Pipeline buffer
     FPipelineBuffer: TMemoryStream;
-    FPipelineCount:  Integer;
-    FPipelining:     Boolean;
+    FPipelineCount: Integer;
+    FPipelining: Boolean;
 
-    const BUF_SIZE = 16384;  // 16 KB â€” buon bilanciamento latenza/throughput
+    const BUF_SIZE = 16384;  // 16 KB — buon bilanciamento latenza/throughput
 
     procedure FillBuffer;
     procedure Log(const aMessage: string; aIsError: Boolean = False);
     procedure AuthenticateAndSelect;
     procedure SetClientName;
-
-  public
+  private
     constructor Create(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger);
-    destructor  Destroy; override;
+  public
+    destructor Destroy; override;
+    class function New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil): IRedisTransport;
 
     { IRedisTransport }
     procedure Connect;
     procedure Disconnect;
-    function  IsConnected: Boolean;
+    function IsConnected: Boolean;
     procedure Send(const aData: TBytes);
     procedure SendCommand(const aParts: array of string);
     procedure PipelineCommand(const aParts: array of string);
-    function  FlushPipeline: TBytes;
-    function  IsPipelining: Boolean;
+    function FlushPipeline: TBytes;
+    function IsPipelining: Boolean;
 
-    { IRedisDataReader â€” usati dal TRedisProtocolParser }
+    { IRedisDataReader — usati dal TRedisProtocolParser }
     function ReadLine: string;
     function ReadBytes(aCount: Integer): TBytes;
   end;
@@ -89,11 +95,16 @@ implementation
 
 { TRedisNativeTransport }
 
+class function TRedisNativeTransport.New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger): IRedisTransport;
+begin
+  Result := TRedisNativeTransport.Create(aConfig, aLogger);
+end;
+
 constructor TRedisNativeTransport.Create(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger);
 begin
   inherited Create;
   FConfig := aConfig;
-  FLogger := aLogger;
+  FLogger := aLogger;  // sempre valido: normalizzato da Registry o dal chiamante
   SetLength(FReadBuffer, BUF_SIZE);
   FBufferPos := 0;
   FBufferLen := 0;
@@ -111,8 +122,6 @@ end;
 
 procedure TRedisNativeTransport.Log(const aMessage: string; aIsError: Boolean);
 begin
-  if not Assigned(FLogger) then 
-    Exit;
   if aIsError then
     FLogger.LogError('Native: ' + aMessage)
   else
@@ -251,20 +260,17 @@ end;
 
 procedure TRedisNativeTransport.SendCommand(const aParts: array of string);
 begin
-  if Assigned(FLogger) then
+  var lCmdStr := '';
+  for var I := Low(aParts) to High(aParts) do
   begin
-    var lCmdStr := '';
-    for var I := Low(aParts) to High(aParts) do
-    begin
-      if I > Low(aParts) then 
-        lCmdStr := lCmdStr + ' ';
-      if (I > Low(aParts)) and (UpperCase(aParts[Low(aParts)]) = 'AUTH') then
-        lCmdStr := lCmdStr + '***'
-      else
-        lCmdStr := lCmdStr + aParts[I];
-    end;
-    FLogger.LogCommand(lCmdStr);
+    if I > Low(aParts) then
+      lCmdStr := lCmdStr + ' ';
+    if (I > Low(aParts)) and (UpperCase(aParts[Low(aParts)]) = 'AUTH') then
+      lCmdStr := lCmdStr + '***'
+    else
+      lCmdStr := lCmdStr + aParts[I];
   end;
+  FLogger.LogCommand(lCmdStr);
 
   Send(TRedisCommandSerializer.Serialize(aParts));
 end;
@@ -285,8 +291,7 @@ begin
   Inc(FPipelineCount);
   FPipelining := True;
 
-  if Assigned(FLogger) then
-    FLogger.LogDebug(Format('Pipeline buffer: %d comandi accodati', [FPipelineCount]));
+  FLogger.LogDebug(Format('Pipeline buffer: %d comandi accodati', [FPipelineCount]));
 end;
 
 function TRedisNativeTransport.FlushPipeline: TBytes;
@@ -308,10 +313,9 @@ begin
 
   FPipelineBuffer.Clear;
   FPipelineCount := 0;
-  FPipelining    := False;
+  FPipelining := False;
 
-  if Assigned(FLogger) then
-    FLogger.LogDebug(Format('Pipeline flushed: %d comandi inviati', [lCount]));
+  FLogger.LogDebug(Format('Pipeline flushed: %d comandi inviati', [lCount]));
 end;
 
 function TRedisNativeTransport.IsPipelining: Boolean;
@@ -388,9 +392,7 @@ begin
     end;
 
     Result := lAcc.ToString;
-
-    if Assigned(FLogger) then
-      FLogger.LogResponse(Result);
+    FLogger.LogResponse(Result);
   finally
     lAcc.Free;
   end;

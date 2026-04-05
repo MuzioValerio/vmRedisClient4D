@@ -119,10 +119,10 @@ begin
     end;
     
     // Set exit code
-//    if Results.FailureCount > 0 then
-//      ExitCode := EXIT_ERRORS
-//    else
-//      ExitCode := EXIT_OK;
+    if Results.FailureCount > 0 then
+      ExitCode := EXIT_ERRORS
+    else
+      ExitCode := EXIT_OK;
 
   except
     on E: Exception do

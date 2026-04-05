@@ -8,16 +8,20 @@ uses
   System.SysUtils,
   System.Classes,
   System.DateUtils,
-  Redis.Response in '..\Redis.Response.pas',
-  Redis.Connection.Config in '..\Redis.Connection.Config.pas',
-  Redis.PubSub in '..\Redis.PubSub.pas',
-  Redis.Client.Intf in '..\Versione 2.0\Redis.Client.Intf.pas',
-  Redis.Client in '..\Versione 2.0\Redis.Client.pas',
-  Redis.HealthCheck in '..\Versione 2.0\Redis.HealthCheck.pas',
-  Redis.Pool in '..\Versione 2.0\Redis.Pool.pas',
-  Redis.Protocol in '..\Versione 2.0\Redis.Protocol.pas',
-  Redis.Transport.Synapse in '..\Versione 2.0\Redis.Transport.Synapse.pas',
-  Redis.Types in '..\Versione 2.0\Redis.Types.pas';
+  Redis.Client.Intf in '..\sources\Redis.Client.Intf.pas',
+  Redis.Client in '..\sources\Redis.Client.pas',
+  Redis.Connection.Config in '..\sources\Redis.Connection.Config.pas',
+  Redis.HealthCheck in '..\sources\Redis.HealthCheck.pas',
+  Redis.Logger.Empty in '..\sources\Redis.Logger.Empty.pas',
+  Redis.Pool in '..\sources\Redis.Pool.pas',
+  Redis.Protocol in '..\sources\Redis.Protocol.pas',
+  Redis.PubSub in '..\sources\Redis.PubSub.pas',
+  Redis.Response in '..\sources\Redis.Response.pas',
+  Redis.Transport.Intf in '..\sources\Redis.Transport.Intf.pas',
+  Redis.Transport.Registry in '..\sources\Redis.Transport.Registry.pas',
+  Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas',
+  Redis.Types in '..\sources\Redis.Types.pas',
+  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas';
 
 procedure Example_HealthCheck_Detailed;
 var
@@ -85,7 +89,7 @@ begin
   Config.MaxRetries := 3;
 
   Logger := TSimpleRedisLogger.New();
-  Client := TRedisClient.New(Config, Logger);
+  Client := TRedisClient.New(Config, Logger, 'grijjy');
 
   CheckCount := 0;
   FailCount := 0;

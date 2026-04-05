@@ -146,7 +146,7 @@ type
 // Costanti
 // ---------------------------------------------------------------------------
 const
-  DEFAULT_REDIS_HOST = 'localhost';
+  DEFAULT_REDIS_HOST = '127.0.0.1';
   DEFAULT_REDIS_PORT = 6379;
   DEFAULT_CONNECTION_TIMEOUT = 5000;
   DEFAULT_READ_TIMEOUT = 30000;

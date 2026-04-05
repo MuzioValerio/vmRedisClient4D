@@ -471,7 +471,7 @@ initialization
   TRedisTransportRegistry.RegisterProvider('synapse',
     function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport
     begin
-      Result := TRedisSynapseTransport.Create(aConfig, aLogger);
+      Result := TRedisSynapseTransport.New(aConfig, aLogger);
     end);
 
 end.
