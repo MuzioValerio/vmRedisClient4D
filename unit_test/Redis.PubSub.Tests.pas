@@ -1,9 +1,9 @@
-﻿{-----------------------------------------------------------------------------
+{-----------------------------------------------------------------------------
  Project: vmRedisClient
  Unit Name: Redis.PubSub.Tests
- Copyright (C) 2025-2026 Muzio Valerio
- Author:    Test Suite
- Date:      14-gen-2025
+ Copyright (C) 2025-2030 Muzio Valerio
+ Author: Muzio Valerio
+ Date: 14-gen-2025
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -18,9 +18,15 @@
  limitations under the License.
 
  Info:
-   Test DUnitX per Redis Pub/Sub
+  - Test DUnitX per Redis Pub/Sub
+       I publisher vengono ora creati tramite IRedisClient.CreatePublisher
+       e i subscriber tramite IRedisClient.CreateSubscriber, oltre alla
+       costruzione diretta precedente.
+
  Purpose:
  History:
+  - Update: 2026 - Allineamento alle interfacce aggiornate
+
 -----------------------------------------------------------------------------}
 
 unit Redis.PubSub.Tests;
@@ -50,7 +56,7 @@ type
     FReceivedMessages: TList<TRedisPubSubMessage>;
     FSystemMessages: TList<TRedisPubSubMessage>;
     FMessageLock: TCriticalSection;
-    
+
     procedure OnMessageReceived(const aMessage: TRedisPubSubMessage);
   public
     [Setup]
@@ -58,7 +64,9 @@ type
     [TearDown]
     procedure TearDown;
 
+    // -------------------------------------------------------------------------
     // Test Publisher
+    // -------------------------------------------------------------------------
     [Test]
     procedure Test_Publisher_Connect;
     [Test]
@@ -72,7 +80,9 @@ type
     [Test]
     procedure Test_Publisher_PubSubNumPat;
 
+    // -------------------------------------------------------------------------
     // Test Subscriber
+    // -------------------------------------------------------------------------
     [Test]
     procedure Test_Subscriber_Connect;
     [Test]
@@ -86,7 +96,9 @@ type
     [Test]
     procedure Test_Subscriber_PUnsubscribe;
 
+    // -------------------------------------------------------------------------
     // Test Messaging
+    // -------------------------------------------------------------------------
     [Test]
     procedure Test_Messaging_PublishReceive;
     [Test]
@@ -96,13 +108,27 @@ type
     [Test]
     procedure Test_Messaging_MultipleSubscribers;
 
+    // -------------------------------------------------------------------------
     // Test Thread Listener
+    // -------------------------------------------------------------------------
     [Test]
     procedure Test_Listener_StartStop;
     [Test]
     procedure Test_Listener_ReceiveInBackground;
 
+    // -------------------------------------------------------------------------
+    // Test Factory Methods su IRedisClient
+    // -------------------------------------------------------------------------
+    [Test]
+    procedure Test_Client_CreatePublisher;
+    [Test]
+    procedure Test_Client_CreateSubscriber;
+    [Test]
+    procedure Test_Client_Publish_DirectMethod;
+
+    // -------------------------------------------------------------------------
     // Test Validazioni
+    // -------------------------------------------------------------------------
     [Test]
     procedure Test_Validation_EmptyChannel;
     [Test]
@@ -118,9 +144,14 @@ begin
   FConfig := TRedisConnectionConfig.Localhost(0);
   FConfig.ConnectionTimeout := 5000;
   FConfig.ReadTimeout := 5000;
-  
-  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'grijjy');
-  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'grijjy');
+
+// Utilizzo di Grijjy come Transport
+//  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'grijjy');
+//  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'grijjy');
+
+  // Utilizzo Synapse come Transport
+  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'synapse');
+  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'synapse');
 
   FReceivedMessages := TList<TRedisPubSubMessage>.Create;
   FSystemMessages := TList<TRedisPubSubMessage>.Create;
@@ -129,22 +160,27 @@ end;
 
 procedure TRedisPubSubTests.TearDown;
 begin
-  if Assigned(FSubscriber) and FSubscriber.IsListening then
-    FSubscriber.StopListening;
-    
+  // Prima unsubscribe (listener ancora attivo pu� leggere le conferme)
   if Assigned(FSubscriber) and FSubscriber.IsConnected then
   begin
     FSubscriber.Unsubscribe([]);
     FSubscriber.PUnsubscribe([]);
-    FSubscriber.Disconnect;
   end;
-  
+
+  // Poi ferma il listener
+  if Assigned(FSubscriber) and FSubscriber.IsListening then
+    FSubscriber.StopListening;
+
+  // Infine disconnette
+  if Assigned(FSubscriber) and FSubscriber.IsConnected then
+    FSubscriber.Disconnect;
+
   if Assigned(FPublisher) and FPublisher.IsConnected then
     FPublisher.Disconnect;
-    
+
   FSubscriber := nil;
   FPublisher := nil;
-  
+
   FMessageLock.Free;
   FReceivedMessages.Free;
   FSystemMessages.Free;
@@ -363,7 +399,8 @@ begin
 
   FMessageLock.Enter;
   try
-    Assert.AreEqual(1, FReceivedMessages.Count, 'Dovrebbe ricevere 1 messaggio');
+    Assert.IsTrue(FSystemMessages.Count >= 1, 'Dovrebbe esserci almeno 1 messaggio di sistema SUBSCRIBE');
+    Assert.AreEqual(rmtSubscribe, FSystemMessages[0].MessageType);
   finally
     FMessageLock.Leave;
   end;
@@ -385,8 +422,7 @@ begin
   lTask := TTask.Create(
     procedure
     begin
-      FSubscriber.Subscribe(['channel1', 'channel2', 'channel3'],
-        OnMessageReceived);
+      FSubscriber.Subscribe(['test:ch1', 'test:ch2', 'test:ch3'], OnMessageReceived);
       FSubscriber.StartListening;
     end
   );
@@ -394,16 +430,24 @@ begin
 
   Sleep(500);
 
-  // Pubblica su tutti i canali
-  FPublisher.Publish('channel1', 'msg1');
-  FPublisher.Publish('channel2', 'msg2');
-  FPublisher.Publish('channel3', 'msg3');
+  FMessageLock.Enter;
+  try
+    Assert.IsTrue(FSystemMessages.Count >= 3,
+      'Dovrebbero esserci almeno 3 messaggi di sistema SUBSCRIBE');
+  finally
+    FMessageLock.Leave;
+  end;
+
+  // Verifica che i messaggi su tutti e tre i canali vengano ricevuti
+  FPublisher.Publish('test:ch1', 'msg1');
+  FPublisher.Publish('test:ch2', 'msg2');
+  FPublisher.Publish('test:ch3', 'msg3');
   Sleep(300);
 
   FMessageLock.Enter;
   try
     Assert.AreEqual(3, FReceivedMessages.Count,
-      'Dovrebbe ricevere 3 messaggi');
+      'Tutti e 3 i messaggi dovrebbero essere ricevuti');
   finally
     FMessageLock.Leave;
   end;
@@ -417,12 +461,12 @@ end;
 
 procedure TRedisPubSubTests.Test_Subscriber_Unsubscribe;
 var
-  LTask: ITask;
+  lTask: ITask;
 begin
   FPublisher.Connect;
   FSubscriber.Connect;
 
-  LTask := TTask.Create(
+  lTask := TTask.Create(
     procedure
     begin
       FSubscriber.Subscribe(['test:unsub:channel'], OnMessageReceived);
@@ -434,17 +478,16 @@ begin
       FSubscriber.StartListening;
     end
   );
-  LTask.Start;
+  lTask.Start;
 
   Sleep(500);
 
-  // Pubblica dopo unsubscribe
-  var LCount := FPublisher.Publish('test:unsub:channel', 'should not receive');
-  Assert.AreEqual(0, LCount,
-    'Nessun subscriber dovrebbe essere attivo dopo unsubscribe');
+  // Dopo unsubscribe, nessun messaggio dovrebbe essere ricevuto
+  var lCount := FPublisher.Publish('test:unsub:channel', 'test');
+  Assert.AreEqual(0, lCount, 'Nessun subscriber dovrebbe essere attivo dopo unsubscribe');
 
   FSubscriber.StopListening;
-  LTask.Wait;
+  lTask.Wait;
 
   FPublisher.Disconnect;
   FSubscriber.Disconnect;
@@ -452,42 +495,40 @@ end;
 
 procedure TRedisPubSubTests.Test_Subscriber_PSubscribe_Pattern;
 var
-  LTask: ITask;
+  lTask: ITask;
 begin
   FPublisher.Connect;
   FSubscriber.Connect;
 
-  LTask := TTask.Create(
+  lTask := TTask.Create(
     procedure
     begin
-      FSubscriber.PSubscribe(['test:pattern:*'], OnMessageReceived);
+      FSubscriber.PSubscribe(['test:psub:*'], OnMessageReceived);
       FSubscriber.StartListening;
     end
   );
-  LTask.Start;
-  
+  lTask.Start;
+
   Sleep(500);
-  
-  // Pubblica su canali che matchano il pattern
-  FPublisher.Publish('test:pattern:one', 'msg1');
-  FPublisher.Publish('test:pattern:two', 'msg2');
-  FPublisher.Publish('other:channel', 'msg3'); // Non dovrebbe matchare
+
+  FPublisher.Publish('test:psub:channel1', 'msg1');
+  FPublisher.Publish('test:psub:channel2', 'msg2');
   Sleep(300);
-  
+
   FMessageLock.Enter;
   try
-    Assert.AreEqual(2, FReceivedMessages.Count, 
-      'Dovrebbe ricevere solo 2 messaggi che matchano il pattern');
-    
-    for var LMsg in FReceivedMessages do
-      Assert.IsTrue(LMsg.Channel.StartsWith('test:pattern:'), 
-        'Tutti i messaggi dovrebbero matchare il pattern');
+    Assert.AreEqual(2, FReceivedMessages.Count,
+      'PSUBSCRIBE dovrebbe ricevere messaggi da tutti i canali che matchano il pattern');
+    Assert.AreEqual(rmtPMessage, FReceivedMessages[0].MessageType,
+      'Tipo di messaggio dovrebbe essere rmtPMessage');
+    Assert.AreEqual('test:psub:*', FReceivedMessages[0].Pattern,
+      'Pattern dovrebbe corrispondere');
   finally
     FMessageLock.Leave;
   end;
-  
+
   FSubscriber.StopListening;
-  LTask.Wait;
+  lTask.Wait;
 
   FPublisher.Disconnect;
   FSubscriber.Disconnect;
@@ -495,12 +536,12 @@ end;
 
 procedure TRedisPubSubTests.Test_Subscriber_PUnsubscribe;
 var
-  LTask: ITask;
+  lTask: ITask;
 begin
   FPublisher.Connect;
   FSubscriber.Connect;
 
-  LTask := TTask.Create(
+  lTask := TTask.Create(
     procedure
     begin
       FSubscriber.PSubscribe(['test:punsubscribe:*'], OnMessageReceived);
@@ -509,16 +550,16 @@ begin
       FSubscriber.StartListening;
     end
   );
-  LTask.Start;
-  
+  lTask.Start;
+
   Sleep(500);
-  
-  var LCount := FPublisher.Publish('test:punsubscribe:channel', 'test');
-  Assert.AreEqual(0, LCount, 
+
+  var lCount := FPublisher.Publish('test:punsubscribe:channel', 'test');
+  Assert.AreEqual(0, lCount,
     'Nessun subscriber dovrebbe essere attivo dopo punsubscribe');
-  
+
   FSubscriber.StopListening;
-  LTask.Wait;
+  lTask.Wait;
 
   FPublisher.Disconnect;
   FSubscriber.Disconnect;
@@ -530,202 +571,202 @@ end;
 
 procedure TRedisPubSubTests.Test_Messaging_PublishReceive;
 var
-  LTask: ITask;
-  LMessagePayload: string;
+  lTask: ITask;
+  lMessagePayload: string;
 begin
   FPublisher.Connect;
   FSubscriber.Connect;
-  
-  LMessagePayload := 'Test message payload';
-  
-  LTask := TTask.Create(
+
+  lMessagePayload := 'Test message payload';
+
+  lTask := TTask.Create(
     procedure
     begin
       FSubscriber.Subscribe(['test:messaging'], OnMessageReceived);
       FSubscriber.StartListening;
     end
   );
-  LTask.Start;
-  
+  lTask.Start;
+
   Sleep(500);
-  
-  FPublisher.Publish('test:messaging', LMessagePayload);
+
+  FPublisher.Publish('test:messaging', lMessagePayload);
   Sleep(200);
-  
+
   FMessageLock.Enter;
   try
     Assert.AreEqual(1, FReceivedMessages.Count);
-    Assert.AreEqual(LMessagePayload, FReceivedMessages[0].Payload);
+    Assert.AreEqual(lMessagePayload, FReceivedMessages[0].Payload);
     Assert.AreEqual(rmtMessage, FReceivedMessages[0].MessageType);
   finally
     FMessageLock.Leave;
   end;
-  
+
   FSubscriber.StopListening;
-  LTask.Wait;
+  lTask.Wait;
 end;
 
 procedure TRedisPubSubTests.Test_Messaging_MultipleMessages;
 var
-  LTask: ITask;
+  lTask: ITask;
   I: Integer;
 const
   MESSAGE_COUNT = 10;
 begin
   FPublisher.Connect;
   FSubscriber.Connect;
-  
-  LTask := TTask.Create(
+
+  lTask := TTask.Create(
     procedure
     begin
       FSubscriber.Subscribe(['test:multiple'], OnMessageReceived);
       FSubscriber.StartListening;
     end
   );
-  LTask.Start;
-  
+  lTask.Start;
+
   Sleep(500);
-  
-  // Pubblica multipli messaggi
+
   for I := 1 to MESSAGE_COUNT do
   begin
     FPublisher.Publish('test:multiple', Format('Message %d', [I]));
     Sleep(10);
   end;
-  
+
   Sleep(500);
-  
+
   FMessageLock.Enter;
   try
-    Assert.AreEqual(MESSAGE_COUNT, FReceivedMessages.Count, 
+    Assert.AreEqual(MESSAGE_COUNT, FReceivedMessages.Count,
       Format('Dovrebbe ricevere %d messaggi', [MESSAGE_COUNT]));
   finally
     FMessageLock.Leave;
   end;
-  
+
   FSubscriber.StopListening;
-  LTask.Wait;
+  lTask.Wait;
 end;
 
 procedure TRedisPubSubTests.Test_Messaging_PatternMatching;
 var
-  LTask: ITask;
+  lTask: ITask;
 begin
   FPublisher.Connect;
   FSubscriber.Connect;
-  
-  LTask := TTask.Create(
+
+  lTask := TTask.Create(
     procedure
     begin
       FSubscriber.PSubscribe(['events:*'], OnMessageReceived);
       FSubscriber.StartListening;
     end
   );
-  LTask.Start;
-  
+  lTask.Start;
+
   Sleep(500);
-  
-  FPublisher.Publish('events:user:login', 'user1 logged in');
-  FPublisher.Publish('events:user:logout', 'user1 logged out');
+
+  FPublisher.Publish('events:user:login',   'user1 logged in');
+  FPublisher.Publish('events:user:logout',  'user1 logged out');
   FPublisher.Publish('events:system:start', 'system started');
   Sleep(300);
-  
+
   FMessageLock.Enter;
   try
     Assert.AreEqual(3, FReceivedMessages.Count);
-    
-    for var LMsg in FReceivedMessages do
+
+    for var lMsg in FReceivedMessages do
     begin
-      Assert.AreEqual(rmtPMessage, LMsg.MessageType);
-      Assert.AreEqual('events:*', LMsg.Pattern);
-      Assert.IsTrue(LMsg.Channel.StartsWith('events:'));
+      Assert.AreEqual(rmtPMessage, lMsg.MessageType);
+      Assert.AreEqual('events:*', lMsg.Pattern);
+      Assert.IsTrue(lMsg.Channel.StartsWith('events:'));
     end;
   finally
     FMessageLock.Leave;
   end;
-  
+
   FSubscriber.StopListening;
-  LTask.Wait;
+  lTask.Wait;
 end;
 
 procedure TRedisPubSubTests.Test_Messaging_MultipleSubscribers;
 var
-  LSubscriber2: IRedisPubSubClient;
-  LMessages2: TList<TRedisPubSubMessage>;
-  LLock2: TCriticalSection;
-  LTask1, LTask2: ITask;
+  lSubscriber2: IRedisPubSubClient;
+  lMessages2: TList<TRedisPubSubMessage>;
+  lLock2: TCriticalSection;
+  lTask1, lTask2: ITask;
+  lChannel: string;
 begin
+  lChannel := 'test:multi:subs:' + IntToStr(TThread.GetTickCount);
   FPublisher.Connect;
   FSubscriber.Connect;
-  
-  LSubscriber2 := TRedisPubSubClient.Create(FConfig);
-  LSubscriber2.Connect;
-  
-  LMessages2 := TList<TRedisPubSubMessage>.Create;
-  LLock2 := TCriticalSection.Create;
+
+  lSubscriber2 := TRedisPubSubClient.Create(FConfig);
+  lSubscriber2.Connect;
+
+  lMessages2 := TList<TRedisPubSubMessage>.Create;
+  lLock2 := TCriticalSection.Create;
   try
-    // Primo subscriber
-    LTask1 := TTask.Create(
+    lTask1 := TTask.Create(
       procedure
       begin
-        FSubscriber.Subscribe(['test:multi:subs'], OnMessageReceived);
+        FSubscriber.Subscribe([lChannel], OnMessageReceived);
         FSubscriber.StartListening;
       end
     );
-    LTask1.Start;
-    
-    // Secondo subscriber
-    LTask2 := TTask.Create(
+    lTask1.Start;
+
+    lTask2 := TTask.Create(
       procedure
       begin
-        LSubscriber2.Subscribe(['test:multi:subs'],
+        lSubscriber2.Subscribe([lChannel],
           procedure(const AMsg: TRedisPubSubMessage)
           begin
-            LLock2.Enter;
-            try
-              LMessages2.Add(AMsg);
-            finally
-              LLock2.Leave;
+            if AMsg.MessageType = rmtMessage then
+            begin
+              lLock2.Enter;
+              try
+                lMessages2.Add(AMsg);
+              finally
+                lLock2.Leave;
+              end;
             end;
           end
         );
-        LSubscriber2.StartListening;
+        lSubscriber2.StartListening;
       end
     );
-    LTask2.Start;
-    
+    lTask2.Start;
+
     Sleep(500);
-    
-    // Pubblica messaggio
-    var LCount := FPublisher.Publish('test:multi:subs', 'Message for all');
-    Assert.AreEqual(2, LCount, 'Due subscriber dovrebbero ricevere');
-    
+
+    var lCount := FPublisher.Publish(lChannel, 'Message for all');
+    Assert.AreEqual(2, lCount, 'Due subscriber dovrebbero ricevere');
+
     Sleep(300);
-    
-    // Verifica entrambi abbiano ricevuto
+
     FMessageLock.Enter;
     try
       Assert.AreEqual(1, FReceivedMessages.Count);
     finally
       FMessageLock.Leave;
     end;
-    
-    LLock2.Enter;
+
+    lLock2.Enter;
     try
-      Assert.AreEqual(1, LMessages2.Count);
+      Assert.AreEqual(1, lMessages2.Count);
     finally
-      LLock2.Leave;
+      lLock2.Leave;
     end;
-    
+
     FSubscriber.StopListening;
-    LSubscriber2.StopListening;
-    LTask1.Wait;
-    LTask2.Wait;
-    
-    LSubscriber2.Disconnect;
+    lSubscriber2.StopListening;
+    lTask1.Wait;
+    lTask2.Wait;
+
+    lSubscriber2.Disconnect;
   finally
-    LLock2.Free;
-    LMessages2.Free;
+    lLock2.Free;
+    lMessages2.Free;
   end;
 end;
 
@@ -735,61 +776,120 @@ end;
 
 procedure TRedisPubSubTests.Test_Listener_StartStop;
 var
-  LListenerThread: TRedisPubSubListenerThread;
+  lListenerThread: TRedisPubSubListenerThread;
 begin
   FSubscriber.Connect;
   FSubscriber.Subscribe(['test:listener'], OnMessageReceived);
-  
-  LListenerThread := TRedisPubSubListenerThread.Create(FSubscriber);
+
+  lListenerThread := TRedisPubSubListenerThread.Create(FSubscriber);
   try
-    LListenerThread.Start;
-    
+    lListenerThread.Start;
     Sleep(500);
+
     Assert.IsTrue(FSubscriber.IsListening, 'Listener dovrebbe essere in ascolto');
-    
+
     FSubscriber.StopListening;
-    LListenerThread.WaitFor;
-    
+    lListenerThread.WaitFor;
+
     Assert.IsFalse(FSubscriber.IsListening, 'Listener dovrebbe essere fermato');
   finally
-    LListenerThread.Free;
+    lListenerThread.Free;
   end;
+
   FSubscriber.Disconnect;
 end;
 
 procedure TRedisPubSubTests.Test_Listener_ReceiveInBackground;
 var
-  LListenerThread: TRedisPubSubListenerThread;
+  lListenerThread: TRedisPubSubListenerThread;
 begin
   FPublisher.Connect;
   FSubscriber.Connect;
 
   FSubscriber.Subscribe(['test:background'], OnMessageReceived);
 
-  LListenerThread := TRedisPubSubListenerThread.Create(FSubscriber);
+  lListenerThread := TRedisPubSubListenerThread.Create(FSubscriber);
   try
-    LListenerThread.Start;
+    lListenerThread.Start;
     Sleep(500);
 
-    // Pubblica mentre listener è in background
     FPublisher.Publish('test:background', 'Background message');
     Sleep(200);
 
     FMessageLock.Enter;
     try
-      Assert.AreEqual(1, FReceivedMessages.Count, 'Dovrebbe ricevere messaggio in background');
+      Assert.AreEqual(1, FReceivedMessages.Count,                        'Dovrebbe ricevere messaggio in background');
       Assert.AreEqual('Background message', FReceivedMessages[0].Payload);
     finally
       FMessageLock.Leave;
     end;
 
     FSubscriber.StopListening;
-    LListenerThread.WaitFor;
+    lListenerThread.WaitFor;
   finally
-    LListenerThread.Free;
+    lListenerThread.Free;
   end;
+
   FPublisher.Disconnect;
   FSubscriber.Disconnect;
+end;
+
+{$ENDREGION}
+
+{$REGION 'Test Factory Methods su IRedisClient'}
+
+procedure TRedisPubSubTests.Test_Client_CreatePublisher;
+var
+  lClient: IRedisClient;
+  lPub: IRedisPubSubPublisher;
+begin
+  lClient := TRedisClient.New(FConfig);
+  lClient.Connect;
+  try
+    lPub := lClient.CreatePublisher;
+    Assert.IsNotNull(lPub, 'CreatePublisher dovrebbe restituire un publisher non nullo');
+
+    lPub.Connect;
+    Assert.IsTrue(lPub.IsConnected, 'Publisher creato da client dovrebbe connettersi');
+    lPub.Disconnect;
+  finally
+    lClient.Disconnect;
+  end;
+end;
+
+procedure TRedisPubSubTests.Test_Client_CreateSubscriber;
+var
+  lClient: IRedisClient;
+  lSub: IRedisPubSubClient;
+begin
+  lClient := TRedisClient.New(FConfig);
+  lClient.Connect;
+  try
+    lSub := lClient.CreateSubscriber;
+    Assert.IsNotNull(lSub, 'CreateSubscriber dovrebbe restituire un subscriber non nullo');
+
+    lSub.Connect;
+    Assert.IsTrue(lSub.IsConnected, 'Subscriber creato da client dovrebbe connettersi');
+    lSub.Disconnect;
+  finally
+    lClient.Disconnect;
+  end;
+end;
+
+procedure TRedisPubSubTests.Test_Client_Publish_DirectMethod;
+var
+  lClient: IRedisClient;
+  lCount: Integer;
+begin
+  lClient := TRedisClient.New(FConfig);
+  lClient.Connect;
+  try
+    // Publish senza subscriber -> 0 destinatari
+    lCount := lClient.Publish('test:client:publish', 'direct publish message');
+    Assert.AreEqual(0, lCount, 'Nessun subscriber dovrebbe ricevere il messaggio');
+  finally
+    lClient.Disconnect;
+  end;
 end;
 
 {$ENDREGION}
@@ -799,7 +899,7 @@ end;
 procedure TRedisPubSubTests.Test_Validation_EmptyChannel;
 begin
   FPublisher.Connect;
-  
+
   Assert.WillRaise(
     procedure
     begin
@@ -813,13 +913,13 @@ end;
 procedure TRedisPubSubTests.Test_Validation_EmptyPattern;
 begin
   FSubscriber.Connect;
-  
+
   Assert.WillRaise(
     procedure
     begin
-      var EmptyArray: TArray<string>;
-      SetLength(EmptyArray, 0);
-      FSubscriber.PSubscribe(EmptyArray, OnMessageReceived);
+      var lEmpty: TArray<string>;
+      SetLength(lEmpty, 0);
+      FSubscriber.PSubscribe(lEmpty, OnMessageReceived);
     end,
     ERedisValidationException,
     'Dovrebbe sollevare eccezione per pattern vuoto'

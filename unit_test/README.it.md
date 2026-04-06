@@ -19,7 +19,8 @@ Suite di test DUnitX completa per **vmRedisClient**, un client Redis nativo scri
 | `TRedisPubSubTests` | 23 | ✅ Tutti superati |
 | **Totale** | **177** | ✅ **0 falliti / 0 errori** |
 
-> Ultima esecuzione: 2026-03-02 — Durata totale: ~88 secondi
+> Ultima esecuzione con Transport Synapse: 2026-04-06 — Durata totale: \~88 secondi<br>
+> Ultima esecuzione con Transport Grijjy Foundation: 2026-04-06 — Durata totale: \~113 secondi
 
 ---
 
@@ -31,6 +32,7 @@ Suite di test DUnitX completa per **vmRedisClient**, un client Redis nativo scri
 | Redis Server | 7.0+ in esecuzione su `localhost:6379` |
 | DUnitX | Installato nel search path |
 | Synapse | Installato nel search path |
+| GrijjyFoundation | Installato nel search path |
 
 > Il server Redis deve essere avviato **senza password** (o aggiornare `TRedisConnectionConfig` nei file di test).
 
@@ -47,17 +49,53 @@ unit_test/
 └── Redis.PubSub.Tests.pas        # Test per Pub/Sub (23 test)
 ```
 
-Il progetto fa riferimento alle unit del client Redis nella cartella `..\..\Versione 2.0\` e a `Redis.Connection.Config` e `Redis.PubSub` nella cartella padre.
+Il progetto fa riferimento alle unit del client Redis nella cartella `..\sources\`.
 
 ---
 
-## Avvio dei test
+## ▶️ Esecuzione Test
+
+### Da Delphi IDE
+
+1. Aprire `RedisClientTests.dpr`
+2. Verificare quale Transpoter si vuole utilizza nei Test 'Synapse' o 'Grijjy' e attivarlo nei sorgenti.
+3. **Run > Run Without Debugging** (Ctrl+Shift+F9)
+4. Premere INVIO quando richiesto
+5. Attendere completamento test
+
+### Da Command Line
 
 ```bash
-# Compilare e avviare RedisClientTests.exe
-# Assicurarsi che Redis sia in esecuzione su localhost:6379
+# Compilare il progetto
+dcc32 RedisClientTests.dpr
 
+# Eseguire i test
 RedisClientTests.exe
+
+# Eseguire con opzioni specifiche
+RedisClientTests.exe -output:console -xml:TestResults.xml
+```
+
+### Opzioni DUnitX
+
+```bash
+# Mostra aiuto
+RedisClientTests.exe -help
+
+# Esegui test specifici
+RedisClientTests.exe -fixture:TRedisClientTests
+
+# Esegui singolo test
+RedisClientTests.exe -test:Test_SetGet_SimpleValue
+
+# Output XML NUnit
+RedisClientTests.exe -xml:results.xml
+
+# Continua su failure
+RedisClientTests.exe -continue
+
+# Modalità silenziosa
+RedisClientTests.exe -silent
 ```
 
 Il runner mostra un banner, attende la pressione di INVIO, esegue tutti i test e stampa il riepilogo. Genera anche un file XML in formato NUnit compatibile con CI/CD (Jenkins, GitLab CI, Azure DevOps).
@@ -297,17 +335,21 @@ Test per il sistema Pub/Sub, publisher, subscriber, pattern e thread listener.
 ## Architettura del client
 
 ```
-Redis.Connection.Config     Configurazione connessione (host, porta, auth, SSL, timeout)
-Redis.Types                 Tipi, costanti, eccezioni, IRedisLogger, IRedisResponse
-Redis.Transport.Synapse     Layer TCP/SSL basato su Synapse
-Redis.Protocol              Parser RESP2, IRedisSynapseTransport
-Redis.Response              Implementazione IRedisResponse
 Redis.Client.Intf           Interfaccia IRedisClient (tutti i comandi Redis)
 Redis.Client                Implementazione TRedisClient
-Redis.Pool                  Connection pool thread-safe con TPooledRedisClient
+Redis.Connection.Config     Configurazione connessione (host, porta, auth, SSL, timeout)
 Redis.HealthCheck           Health check con metriche (ping, latenza, info)
+Redis.Logger.Empty          Implementazione Logger vuoto per passare sempre un Logger
+Redis.Pool                  Connection pool thread-safe con TPooledRedisClient
+Redis.Protocol              Parser RESP2, IRedisSynapseTransport
 Redis.PubSub                Publisher (IRedisPubSubPublisher) e
                             Subscriber (IRedisPubSubClient) con listener thread
+Redis.Response              Implementazione IRedisResponse
+Redis.Transport.Grijjy      Layer TSP/SSL basato su GrijjyFoundation
+Redis.Transport.Intf        Interfaccia comune per la gestione dei Transpoter
+Redis.Transport.Registry    Factory in cui i Transpoter si auto-registrano per essere utilizzati
+Redis.Transport.Synapse     Layer TCP/SSL basato su Synapse
+Redis.Types                 Tipi, costanti, eccezioni, IRedisLogger, IRedisResponse
 ```
 
 ---
@@ -319,6 +361,191 @@ Redis.PubSub                Publisher (IRedisPubSubPublisher) e
 - I canali usati nei test usano prefissi `test:` per evitare collisioni
 - `Test_Messaging_MultipleSubscribers` usa un nome canale univoco a runtime (`GetTickCount`) per prevenire subscription zombie da esecuzioni precedenti
 - L'output XML è compatibile con NUnit per integrazione CI/CD
+
+---
+
+## 🐛 Risoluzione Problemi
+
+### Redis Non Risponde
+
+**Sintomo**: Test falliscono con "Connection refused"
+
+**Soluzione**:
+```bash
+# Verifica che Redis sia in esecuzione
+redis-cli ping
+
+# Se non risponde, avvia Redis
+redis-server
+
+# Verifica porta
+netstat -an | findstr :6379
+```
+
+### Test Timeout
+
+**Sintomo**: Test superano i timeout configurati
+
+**Possibili cause**:
+1. Redis sovraccarico
+2. Rete lenta
+3. Troppi test concorrenti
+
+**Soluzione**:
+```delphi
+// In Setup, aumenta i timeout:
+FConfig.ConnectionTimeout := 10000;  // 10 secondi
+FConfig.ReadTimeout := 10000;
+```
+
+### Test Pub/Sub Intermittenti
+
+**Sintomo**: Test Pub/Sub falliscono sporadicamente
+
+**Causa**: Race condition nei timing
+
+**Soluzione**:
+```delphi
+// Aumenta gli Sleep nei test Pub/Sub:
+Sleep(1000);  // Invece di Sleep(500)
+```
+
+### Memoria Crescente
+
+**Sintomo**: Uso memoria cresce durante i test
+
+**Causa**: Chiavi non ripulite
+
+**Soluzione**:
+```bash
+# Pulisci database tra i test
+redis-cli FLUSHDB
+
+# O usa database separato per test
+# Modificare Setup:
+FConfig := TRedisConnectionConfig.Localhost(15);  // Database 15 per test
+```
+
+### Test Falliscono su CI/CD
+
+**Problema**: Test ok localmente, falliscono su CI
+
+**Checklist**:
+- [ ] Redis installato e avviato
+- [ ] Porta 6379 accessibile
+- [ ] Firewall configurato
+- [ ] Timeout aumentati per CI lento
+- [ ] Nessuna autenticazione richiesta
+
+**Esempio GitHub Actions**:
+```yaml
+jobs:
+  test:
+    runs-on: windows-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run tests
+        run: RedisClientTests.exe
+```
+
+## 📝 Best Practices
+
+### Esecuzione Test
+
+1. **Sempre** eseguire su database dedicato (non produzione!)
+2. **Pulire** il database prima/dopo i test
+3. **Verificare** che Redis sia in esecuzione
+4. **Monitorare** l'uso memoria di Redis
+5. **Eseguire** i test in ordine casuale (DUnitX default)
+
+### Aggiunta Nuovi Test
+
+```delphi
+[Test]
+procedure TRedisClientTests.Test_MyNewFeature;
+begin
+  // Arrange (Setup)
+  FClient.SetValue('test:key', 'value');
+
+  // Act (Esecuzione)
+  var LResult := FClient.Get('test:key');
+
+  // Assert (Verifica)
+  Assert.AreEqual('value', LResult.AsString);
+
+  // Cleanup
+  FClient.Del(['test:key']);
+end;
+```
+
+### Naming Convention
+
+```
+Test_[Componente]_[Azione]_[Scenario]
+
+Esempi:
+- Test_Pool_Acquire_TimeoutWhenPoolSaturated
+- Test_Subscriber_Subscribe_MultipleChannels
+- Test_Validation_EmptyKey
+```
+
+## 🎯 Continuous Integration
+
+### Script Esempio (CI)
+
+```bash
+#!/bin/bash
+set -e
+
+echo "Starting Redis..."
+redis-server --daemonize yes
+
+echo "Waiting for Redis..."
+timeout 30 bash -c 'until redis-cli ping; do sleep 1; done'
+
+echo "Running tests..."
+./RedisClientTests
+
+echo "Stopping Redis..."
+redis-cli shutdown
+```
+
+### Docker Compose
+
+```yaml
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  tests:
+    build: .
+    depends_on:
+      - redis
+    command: RedisClientTests.exe
+```
+
+## 📞 Supporto
+
+Per problemi con i test:
+
+1. Verifica i [prerequisiti](#prerequisiti)
+2. Consulta [risoluzione problemi](#risoluzione-problemi)
+3. Apri issue su GitHub con:
+   - Output completo dei test
+   - Versione Delphi
+   - Versione Redis
+   - Sistema operativo
+
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/MuzioValerio/vmRedisClient4D/issues)
+- 💡 **Feature Requests**: [GitHub Discussions](https://github.com/MuzioValerio/vmRedisClient4D/discussions)
 
 ---
 

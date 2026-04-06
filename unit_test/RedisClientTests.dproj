@@ -1,9 +1,9 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
-        <ProjectGuid>{0FB80772-98AE-4EDD-AFE7-CD7601B4D19F}</ProjectGuid>
+        <ProjectGuid>{C58F8874-D01D-4696-8114-29A7F95A061F}</ProjectGuid>
         <MainSource>RedisClientTests.dpr</MainSource>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">Debug</Config>
+        <Config Condition="'$(Config)'==''">Release</Config>
         <ProjectName Condition="'$(ProjectName)'==''">RedisClientTests</ProjectName>
         <TargetedPlatforms>167937</TargetedPlatforms>
         <AppType>Console</AppType>
@@ -34,6 +34,30 @@
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Android64' and '$(Cfg_1)'=='true') or '$(Cfg_1_Android64)'!=''">
+        <Cfg_1_Android64>true</Cfg_1_Android64>
+        <CfgParent>Cfg_1</CfgParent>
+        <Cfg_1>true</Cfg_1>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='OSX64' and '$(Cfg_1)'=='true') or '$(Cfg_1_OSX64)'!=''">
+        <Cfg_1_OSX64>true</Cfg_1_OSX64>
+        <CfgParent>Cfg_1</CfgParent>
+        <Cfg_1>true</Cfg_1>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='OSXARM64' and '$(Cfg_1)'=='true') or '$(Cfg_1_OSXARM64)'!=''">
+        <Cfg_1_OSXARM64>true</Cfg_1_OSXARM64>
+        <CfgParent>Cfg_1</CfgParent>
+        <Cfg_1>true</Cfg_1>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_1)'=='true') or '$(Cfg_1_Win32)'!=''">
+        <Cfg_1_Win32>true</Cfg_1_Win32>
+        <CfgParent>Cfg_1</CfgParent>
+        <Cfg_1>true</Cfg_1>
+        <Base>true</Base>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Debug' or '$(Cfg_2)'!=''">
         <Cfg_2>true</Cfg_2>
         <CfgParent>Base</CfgParent>
@@ -53,12 +77,6 @@
     </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='OSXARM64' and '$(Cfg_2)'=='true') or '$(Cfg_2_OSXARM64)'!=''">
         <Cfg_2_OSXARM64>true</Cfg_2_OSXARM64>
-        <CfgParent>Cfg_2</CfgParent>
-        <Cfg_2>true</Cfg_2>
-        <Base>true</Base>
-    </PropertyGroup>
-    <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Cfg_2)'=='true') or '$(Cfg_2_Win32)'!=''">
-        <Cfg_2_Win32>true</Cfg_2_Win32>
         <CfgParent>Cfg_2</CfgParent>
         <Cfg_2>true</Cfg_2>
         <Base>true</Base>
@@ -123,6 +141,23 @@
         <DCC_LocalDebugSymbols>false</DCC_LocalDebugSymbols>
         <DCC_SymbolReferenceInfo>0</DCC_SymbolReferenceInfo>
     </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_Android64)'!=''">
+        <BT_BuildType>Debug</BT_BuildType>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_OSX64)'!=''">
+        <BT_BuildType>Debug</BT_BuildType>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_OSXARM64)'!=''">
+        <BT_BuildType>Debug</BT_BuildType>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
+        <DCC_ExeOutput>.\bin</DCC_ExeOutput>
+        <DCC_DcuOutput>.\dcu</DCC_DcuOutput>
+        <VerInfo_Locale>1033</VerInfo_Locale>
+        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
+        <Manifest_File>(None)</Manifest_File>
+        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
+    </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
         <DCC_Optimize>false</DCC_Optimize>
@@ -139,35 +174,27 @@
     <PropertyGroup Condition="'$(Cfg_2_OSXARM64)'!=''">
         <BT_BuildType>Debug</BT_BuildType>
     </PropertyGroup>
-    <PropertyGroup Condition="'$(Cfg_2_Win32)'!=''">
-        <DCC_ExeOutput>.\bin</DCC_ExeOutput>
-        <DCC_DcuOutput>.\dcu</DCC_DcuOutput>
-        <VerInfo_Locale>1033</VerInfo_Locale>
-        <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
-        <Manifest_File>(None)</Manifest_File>
-        <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
-    </PropertyGroup>
     <ItemGroup>
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
+        <DCCReference Include="..\..\sources\Redis.Client.Intf.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Client.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Connection.Config.pas"/>
+        <DCCReference Include="..\..\sources\Redis.HealthCheck.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Logger.Empty.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Pool.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Protocol.pas"/>
+        <DCCReference Include="..\..\sources\Redis.PubSub.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Response.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Transport.Grijjy.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Transport.Intf.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Transport.Registry.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Transport.Synapse.pas"/>
+        <DCCReference Include="..\..\sources\Redis.Types.pas"/>
         <DCCReference Include="Redis.Client.Tests.pas"/>
         <DCCReference Include="Redis.Pool.Tests.pas"/>
         <DCCReference Include="Redis.PubSub.Tests.pas"/>
-        <DCCReference Include="..\sources\Redis.Client.Intf.pas"/>
-        <DCCReference Include="..\sources\Redis.Client.pas"/>
-        <DCCReference Include="..\sources\Redis.Connection.Config.pas"/>
-        <DCCReference Include="..\sources\Redis.HealthCheck.pas"/>
-        <DCCReference Include="..\sources\Redis.Logger.Empty.pas"/>
-        <DCCReference Include="..\sources\Redis.Pool.pas"/>
-        <DCCReference Include="..\sources\Redis.Protocol.pas"/>
-        <DCCReference Include="..\sources\Redis.PubSub.pas"/>
-        <DCCReference Include="..\sources\Redis.Response.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Grijjy.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Intf.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Registry.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Synapse.pas"/>
-        <DCCReference Include="..\sources\Redis.Types.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
@@ -217,7 +244,13 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName="bin\RedisClientTests.exe" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName="RedisClientTests.exe" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>RedisClientTests.exe</RemoteName>
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="bin\RedisClientTests.exe" Configuration="Release" Class="ProjectOutput">
                     <Platform Name="Win32">
                         <RemoteName>RedisClientTests.exe</RemoteName>
                         <Overwrite>true</Overwrite>

@@ -1,9 +1,9 @@
-# vmRedisClient
+                              # vmRedisClient
 
 ![Delphi](https://img.shields.io/badge/Delphi-10.4+-red.svg)
 ![Redis](https://img.shields.io/badge/Redis-6.x%20|%207.x%20|%208.x-DC382D.svg)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
-![Version](https://img.shields.io/badge/version-2.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-2.1-brightgreen.svg)
 
 Client Redis nativo per Delphi con supporto completo per protocollo RESP, connection pooling, Pipeline, Pub/Sub, Scripting Lua e SSL/TLS. Implementato da zero senza dipendenze da progetti esterni, offre un'interfaccia pulita e intuitiva per tutte le operazioni Redis.
 
@@ -17,6 +17,7 @@ Client Redis nativo per Delphi con supporto completo per protocollo RESP, connec
 - [Requisiti](#-requisiti)
 - [Installazione](#-installazione)
 - [Guida Rapida](#-guida-rapida)
+- [Transport Layer](#-transport-layer)
 - [Documentazione Comandi](#-documentazione-comandi)
 - [Pipeline](#-pipeline)
 - [Scripting Lua](#-scripting-lua)
@@ -49,6 +50,7 @@ Client Redis nativo per Delphi con supporto completo per protocollo RESP, connec
 - ✅ **Health Check** — Monitoraggio dettagliato con timestamp, ping time e stato trasporto
 - ✅ **Logging** — Sistema estensibile via `IRedisLogger` (Command/Response/Error/Warning/Info/Debug)
 - ✅ **Comando generico** — `ExecuteCommand` come escape hatch per qualsiasi comando Redis
+- ✅ **Transport Layer pluggabile** — `IRedisTransport` unificata, Registry con auto-registrazione, supporto Synapse e GrijjyFoundation
 
 ### Comandi supportati per tipo
 - **Stringhe** — SET, GET, MGET, MSET, MSETNX, GETSET, SETEX, PSETEX, SETNX, GETEX, GETEXPERSIST, GETDEL, APPEND, STRLEN, SETRANGE, GETRANGE, INCR, INCRBY, INCRBYFLOAT, DECR, DECRBY
@@ -67,7 +69,7 @@ Client Redis nativo per Delphi con supporto completo per protocollo RESP, connec
 - `EXPIRETIME` / `PEXPIRETIME` (Redis 7+)
 
 ### Compatibilità
-- Delphi 10.4 Sydney e superiori — Windows 32-bit e 64-bit
+- Delphi 10.4 Sydney e superiori — Windows 32-bit e 64-bit, Linux, macOS (con Grijjy)
 - Managed records con Initialize/Finalize/Assign operator
 - Interface-based design per gestione automatica della memoria
 - Amazon ElastiCache e Azure Cache for Redis
@@ -79,8 +81,9 @@ Client Redis nativo per Delphi con supporto completo per protocollo RESP, connec
 
 - Delphi 10.4 Sydney o superiore
 - Redis Server 6.x, 7.x o 8.x
-- [Synapse](http://synapse.ararat.cz/) — inclusa nel progetto
-- OpenSSL 3.x DLL (`libssl-3-x64.dll`, `libcrypto-3-x64.dll`) — solo per SSL/TLS
+- [Synapse](https://github.com/geby/synapse) — inclusa nel progetto (transport `synapse`, default)
+- [GrijjyFoundation](https://github.com/grijjy/GrijjyFoundation) — inclusa nel progetto (transport `grijjy`, cross-platform)
+- OpenSSL 3.x DLL (`libssl-3-x64.dll`, `libcrypto-3-x64.dll`) — solo per SSL/TLS con Synapse
 
 ---
 
@@ -95,17 +98,19 @@ Aggiungi al **Library Path** del tuo progetto Delphi:
 ```
 vmRedisClient\Source
 vmRedisClient\Synapse
+vmRedisClient\GrijjyFoundation
 ```
 
 ---
 
 ## 🎯 Guida Rapida
 
-### Connessione Semplice
+### Connessione Semplice (transport Synapse — default)
 
 ```delphi
 uses
-  Redis.Client, Redis.Connection.Config, Redis.Types, Redis.Response;
+  Redis.Client, Redis.Connection.Config, Redis.Types, Redis.Response,
+  Redis.Transport.Synapse;  // auto-registra il provider 'synapse'
 
 var
   lConfig: TRedisConnectionConfig;  // managed record: auto-inizializzato
@@ -113,7 +118,7 @@ var
 begin
   lConfig := TRedisConnectionConfig.Localhost;  // host=localhost, port=6379
 
-  lClient := TRedisClient.New(lConfig);
+  lClient := TRedisClient.New(lConfig);         // provider 'synapse' di default
   lClient.Connect;
   try
     if lClient.Ping then
@@ -124,6 +129,26 @@ begin
   finally
     lClient.Disconnect;
   end;
+end;
+```
+
+### Connessione con transport GrijjyFoundation (cross-platform)
+
+```delphi
+uses
+  Redis.Client, Redis.Connection.Config,
+  Redis.Transport.Grijjy;  // auto-registra il provider 'grijjy'
+
+var
+  lClient: IRedisClient;
+begin
+  lClient := TRedisClient.New(
+    TRedisConnectionConfig.Localhost,
+    nil,        // logger opzionale
+    'grijjy'   // provider esplicito
+  );
+  lClient.Connect;
+  // ... utilizzo identico a Synapse
 end;
 ```
 
@@ -145,6 +170,223 @@ uses Redis.HealthCheck;  // TSimpleRedisLogger
 lLogger := TSimpleRedisLogger.New;
 lClient := TRedisClient.New(lConfig, lLogger);
 ```
+
+---
+
+## 🔌 Transport Layer
+
+### Panoramica
+
+Dalla v2.1 il transport layer è completamente disaccoppiato dal client Redis. Tutte le implementazioni condividono un'interfaccia unificata (`IRedisTransport`) e si registrano automaticamente in un registry globale (`TRedisTransportRegistry`). Il client non conosce e non dipende dal trasporto concreto.
+
+```
+IRedisDataReader          ← lettura grezza (usata da TRedisProtocolParser)
+  └── IRedisTransport     ← interfaccia unificata per tutti i transport
+        ├── TRedisNativeTransport   (Synapse, provider 'synapse')
+        └── TRedisGrijjyTransport   (GrijjyFoundation, provider 'grijjy')
+```
+
+`IRedisSynapseTransport` è mantenuto come alias di compatibilità — il codice esistente che lo usa non necessita modifiche.
+
+---
+
+### `IRedisTransport` — Interfaccia Unificata
+
+Definita in `Redis.Transport.Intf`, sostituisce la precedente `IRedisSynapseTransport` (ora alias) e la vecchia `IRedisTransport` minimale.
+
+```delphi
+// Redis.Transport.Intf.pas
+
+// Lettura dati grezzi — usata da TRedisProtocolParser
+IRedisDataReader = interface
+  function ReadLine: string;
+  function ReadBytes(aCount: Integer): TBytes;
+end;
+
+// Interfaccia unificata per tutti i transport Redis
+IRedisTransport = interface(IRedisDataReader)
+  procedure Connect;
+  procedure Disconnect;
+  function  IsConnected: Boolean;
+
+  // Invio dati grezzi
+  procedure Send(const aData: TBytes);
+
+  // Serializza e invia un comando RESP
+  procedure SendCommand(const aParts: array of string);
+
+  // Pipeline: accumula comandi nel buffer senza inviarli
+  procedure PipelineCommand(const aParts: array of string);
+  // Invia tutto il buffer pipeline in un unico write e lo svuota
+  function  FlushPipeline: TBytes;
+  function  IsPipelining: Boolean;
+end;
+
+// Alias di retrocompatibilità
+IRedisSynapseTransport = IRedisTransport;
+```
+
+---
+
+### Transport Registry
+
+`TRedisTransportRegistry` (in `Redis.Transport.Registry`) è il punto centrale di registrazione e acquisizione dei transport.
+
+```delphi
+// Registra un nuovo provider (chiamato nella sezione initialization della unit)
+TRedisTransportRegistry.RegisterProvider('myprovider',
+  function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport
+  begin
+    Result := TMyTransport.New(aConfig, aLogger);
+  end);
+
+// Acquisisce un transport per ID
+var lTransport := TRedisTransportRegistry.Acquire('synapse', lConfig, lLogger);
+var lTransport := TRedisTransportRegistry.Acquire('grijjy', lConfig, lLogger);
+```
+
+La ricerca degli ID è **case-insensitive**. Se il provider non è registrato viene sollevata una eccezione con messaggio esplicito.
+
+> **Importante:** per attivare un provider è sufficiente aggiungere la sua unit al progetto. La sezione `initialization` della unit si occupa della registrazione automatica.
+
+---
+
+### Provider Synapse (default)
+
+**Unit:** `Redis.Transport.Synapse`
+**Provider ID:** `'synapse'`
+**Piattaforme:** Windows 32/64-bit
+
+Transport storico basato su [Synapse](https://github.com/geby/synapse). È il default quando si chiama `TRedisClient.New` senza specificare il provider.
+
+```delphi
+uses Redis.Transport.Synapse;  // auto-registrazione al caricamento
+
+lClient := TRedisClient.New(lConfig);          // 'synapse' implicito
+lClient := TRedisClient.New(lConfig, nil, 'synapse');  // esplicito
+```
+
+Caratteristiche:
+- SSL/TLS tramite OpenSSL (richiede `libssl-3-x64.dll` / `libcrypto-3-x64.dll`)
+- mTLS con certificato client
+- Retry automatico su connessione e autenticazione
+
+---
+
+### Provider Grijjy (cross-platform)
+
+**Unit:** `Redis.Transport.Grijjy`
+**Provider ID:** `'grijjy'`
+**Piattaforme:** Windows, Linux, macOS, iOS, Android
+
+Transport ad alte prestazioni basato su [GrijjyFoundation](https://github.com/grijjy/GrijjyFoundation). Usa I/O asincrono event-based (`TgoClientSocketManager`) e SSL/TLS nativo senza dipendenze aggiuntive da OpenSSL.
+
+```delphi
+uses Redis.Transport.Grijjy;  // auto-registrazione al caricamento
+
+lClient := TRedisClient.New(lConfig, nil, 'grijjy');
+lClient.Connect;
+```
+
+Caratteristiche:
+- SSL/TLS nativo cross-platform (GrijjyFoundation / BoringSSL)
+- mTLS con certificato client (`FSocket.Certificate`, `FSocket.Password`)
+- I/O asincrono non bloccante — sincronizzato via `TEvent` per compatibilità con il protocollo sincrono
+- Buffer di ricezione thread-safe protetto da `TCriticalSection`
+- Auto-registrazione nel registry con ID `'grijjy'`
+
+**Dipendenze compile-time:**
+
+```delphi
+{$IFDEF MSWINDOWS}
+  Grijjy.SocketPool.Win
+{$ELSE}
+  Grijjy.SocketPool.Linux
+{$ENDIF}
+Grijjy.OpenSSL
+```
+
+**SSL con Grijjy:**
+
+```delphi
+lConfig := TRedisConnectionConfig.WithSSL(
+  'redis.example.com', 6380, 'user', 'pass', True
+);
+
+// mTLS — certificato client
+lConfig.ClientCertificatePath     := '/etc/certs/client.pem';
+lConfig.ClientCertificatePassword := 'certpass';
+
+lClient := TRedisClient.New(lConfig, nil, 'grijjy');
+lClient.Connect;
+```
+
+---
+
+### Scegliere il Transport
+
+| Criterio | Synapse | Grijjy |
+|---|---|---|
+| **Piattaforme** | Windows | Windows, Linux, macOS, iOS, Android |
+| **SSL/TLS** | OpenSSL (DLL esterna) | Nativo (BoringSSL incluso) |
+| **Modello I/O** | Sincrono bloccante | Asincrono event-based |
+| **Performance** | Alta | Molto alta |
+| **Dipendenze** | Synapse + OpenSSL DLL | GrijjyFoundation |
+| **Default** | ✅ Sì | No (include la unit) |
+
+---
+
+### Implementare un Transport Personalizzato
+
+Per creare un nuovo transport è sufficiente implementare `IRedisTransport` e registrarlo:
+
+```delphi
+unit Redis.Transport.MyCustom;
+
+interface
+
+uses
+  Redis.Transport.Intf, Redis.Connection.Config, Redis.Types;
+
+type
+  TMyCustomTransport = class(TInterfacedObject, IRedisTransport)
+  private
+    // ... campi privati ...
+  public
+    { IRedisTransport }
+    procedure Connect;
+    procedure Disconnect;
+    function  IsConnected: Boolean;
+    procedure Send(const aData: TBytes);
+    procedure SendCommand(const aParts: array of string);
+    procedure PipelineCommand(const aParts: array of string);
+    function  FlushPipeline: TBytes;
+    function  IsPipelining: Boolean;
+    { IRedisDataReader }
+    function ReadLine: string;
+    function ReadBytes(aCount: Integer): TBytes;
+
+    class function New(const aConfig: TRedisConnectionConfig;
+      aLogger: IRedisLogger): IRedisTransport;
+  end;
+
+implementation
+
+uses Redis.Transport.Registry;
+
+// ... implementazione ...
+
+initialization
+  TRedisTransportRegistry.RegisterProvider('mycustom',
+    function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport
+    begin
+      Result := TMyCustomTransport.New(aConfig, aLogger);
+    end);
+
+end.
+```
+
+Poi basta aggiungere la unit al progetto e usare `TRedisClient.New(lConfig, nil, 'mycustom')`.
 
 ---
 
@@ -605,7 +847,12 @@ lConfig := TRedisConnectionConfig.WithSSL(
 lConfig.ClientCertificatePath     := 'C:\certs\client.pem';
 lConfig.ClientCertificatePassword := 'certpass';
 
-lClient := TRedisClient.New(lConfig);
+// Con Synapse (Windows, OpenSSL DLL)
+lClient := TRedisClient.New(lConfig, nil, 'synapse');
+
+// Con Grijjy (cross-platform, SSL nativo)
+lClient := TRedisClient.New(lConfig, nil, 'grijjy');
+
 lClient.Connect;
 ```
 
@@ -903,21 +1150,26 @@ lRank := lClient.ZRevRank(BOARD, aPlayer);
 ```
 vmRedisClient/
 ├── Source/
-│   ├── Redis.Client.Intf.pas        # Interfaccia IRedisClient
-│   ├── Redis.Client.pas             # Implementazione TRedisClient
-│   ├── Redis.Connection.Config.pas  # TRedisConnectionConfig (managed record)
-│   ├── Redis.Protocol.pas           # Parser RESP + serializzatore
-│   ├── Redis.Response.pas           # IRedisResponse / TRedisResponse
-│   ├── Redis.Transport.Synapse.pas  # Layer TCP/SSL (Synapse)
-│   ├── Redis.Types.pas              # Tipi, eccezioni, TRedisScanResult
-│   ├── Redis.Pool.pas               # Pool + helper + statistiche
-│   ├── Redis.PubSub.pas             # Publisher, Subscriber, ListenerThread
-│   └── Redis.HealthCheck.pas        # TSimpleRedisLogger
+│   ├── Redis.Client.Intf.pas            # Interfaccia IRedisClient
+│   ├── Redis.Client.pas                 # Implementazione TRedisClient
+│   ├── Redis.Connection.Config.pas      # TRedisConnectionConfig (managed record)
+│   ├── Redis.Protocol.pas               # Parser RESP + serializzatore
+│   ├── Redis.Response.pas               # IRedisResponse / TRedisResponse
+│   ├── Redis.Transport.Intf.pas         # IRedisTransport / IRedisDataReader (NEW v2.1)
+│   ├── Redis.Transport.Registry.pas     # TRedisTransportRegistry (NEW v2.1)
+│   ├── Redis.Transport.Synapse.pas      # Transport Synapse (Windows)
+│   ├── Redis.Transport.Grijjy.pas       # Transport GrijjyFoundation (cross-platform, NEW v2.1)
+│   ├── Redis.Logger.Empty.pas           # TRedisEmptyLogger (no-op logger)
+│   ├── Redis.Types.pas                  # Tipi, eccezioni, TRedisScanResult
+│   ├── Redis.Pool.pas                   # Pool + helper + statistiche
+│   ├── Redis.PubSub.pas                 # Publisher, Subscriber, ListenerThread
+│   └── Redis.HealthCheck.pas            # TSimpleRedisLogger
 ├── Synapse/
+├── GrijjyFoundation/
 ├── Examples/
 │   ├── ExampleConsole.dpr
-│   ├── ExamplePooling.dpr           # 8 pattern di pooling e concorrenza
-│   ├── ExamplePubSub.dpr            # 3 pattern Pub/Sub + Event Manager
+│   ├── ExamplePooling.dpr               # 8 pattern di pooling e concorrenza
+│   ├── ExamplePubSub.dpr                # 3 pattern Pub/Sub + Event Manager
 │   └── ExampleHealthCheck.dpr
 └── Tests/
     ├── Redis.Client.Tests.pas
@@ -931,7 +1183,8 @@ vmRedisClient/
 - **Factory Pattern** — `TRedisClient.New`, `TRedisConnectionConfig.Localhost/WithACL/WithSSL`, `TRedisConnectionPool.New`
 - **Observer Pattern** — Pub/Sub con `TRedisMessageCallback`
 - **Object Pool Pattern** — `TRedisConnectionPool` + `TPooledConnection` + statistiche
-- **Strategy Pattern** — Logger sostituibile via `IRedisLogger`
+- **Strategy Pattern** — Logger sostituibile via `IRedisLogger`; Transport intercambiabile via `IRedisTransport` + Registry
+- **Registry Pattern** — `TRedisTransportRegistry` con auto-registrazione via `initialization`
 - **Managed Record** — `TRedisConnectionConfig`, `TRedisPoolConfig`, `TPooledRedisClient`
 
 ### Thread Safety
@@ -941,6 +1194,7 @@ vmRedisClient/
 - ✅ Publisher e Subscriber — connessioni TCP dedicate e isolate
 - ✅ `TRedisPubSubListenerThread` — ascolto in background senza bloccare l'app
 - ✅ `AcquireConnectionOnDb` — SELECT sicuro per ogni thread
+- ✅ `TRedisGrijjyTransport` — buffer di ricezione protetto da `TCriticalSection` + `TEvent`
 - ⚠️ `IRedisClient` base — **NON** thread-safe: usa il pool in applicazioni multi-thread
 
 ---
@@ -1016,6 +1270,12 @@ WriteLn(lConfig.ToConnectionString);
 - Chiudi sempre con **Disconnect** nel `finally`, oppure usa `TPooledRedisClient`
 - Usa **`AcquireConnectionOnDb`** invece di `Select` manuale su connessioni pooled
 
+### Transport
+- Usa **Synapse** per applicazioni Windows-only: è il default e non richiede configurazione aggiuntiva
+- Usa **Grijjy** per applicazioni cross-platform o quando serve SSL nativo senza DLL esterne
+- Aggiungi al progetto **solo la unit del transport che ti serve**: la registrazione è automatica
+- Verifica che `IRedisSynapseTransport` sia trattato come alias di `IRedisTransport` — il codice precedente funziona senza modifiche
+
 ### Performance
 - Usa **Pipeline** per operazioni batch: N round-trip → 1
 - Usa **SCAN** invece di **KEYS** su dataset grandi — KEYS è bloccante
@@ -1055,6 +1315,13 @@ WriteLn(lConfig.ToConnectionString);
 - [x] `TRedisPoolStats` con metriche dettagliate
 - [x] SSL/TLS con mTLS
 
+### Completato in v2.1 ✅
+- [x] **`IRedisTransport` unificata** — sostituisce `IRedisSynapseTransport` (alias mantenuto per retrocompatibilità)
+- [x] **`TRedisTransportRegistry`** — registry globale con auto-registrazione via `initialization`
+- [x] **Transport Grijjy** — `TRedisGrijjyTransport` cross-platform con I/O asincrono e SSL nativo
+- [x] `TRedisClient.New` con parametro `aProvider` opzionale (`'synapse'` default, `'grijjy'` disponibile)
+- [x] Supporto Linux/macOS/iOS/Android tramite provider Grijjy
+
 ### In Pianificazione
 - [ ] Redis Streams (XADD, XREAD, XGROUP, XACK)
 - [ ] Geospatial (GEOADD, GEODIST, GEORADIUS, GEOSEARCH)
@@ -1080,6 +1347,7 @@ WriteLn(lConfig.ToConnectionString);
 - Aggiorna la documentazione per modifiche alle API pubbliche di `IRedisClient`
 - Testa su Delphi 10.4+ e su Redis 7.x e 8.x
 - Mantieni la compatibilità all'indietro di `IRedisClient`
+- Per nuovi transport: implementa `IRedisTransport`, auto-registra nella sezione `initialization`
 
 ---
 
@@ -1088,7 +1356,7 @@ WriteLn(lConfig.ToConnectionString);
 Distribuito sotto **Apache License 2.0** — vedi [LICENSE](LICENSE) per il testo completo.
 
 ```
-Copyright 2025 Muzio Valerio
+Copyright 2025-2026 Muzio Valerio
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -1101,7 +1369,8 @@ You may obtain a copy of the License at
 
 ## 👏 Ringraziamenti
 
-- [Synapse](http://synapse.ararat.cz/) — Libreria TCP/IP per Delphi
+- [Synapse](https://github.com/geby/synapse) — Libreria TCP/IP per Delphi (transport `synapse`)
+- [GrijjyFoundation](https://github.com/grijjy/GrijjyFoundation) — Libreria TCP/IP cross-platform per Delphi (transport `grijjy`)
 - [Redis](https://redis.io/) — Il database in-memory
 - Community Delphi per supporto e feedback
 
