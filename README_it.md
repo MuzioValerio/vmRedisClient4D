@@ -7,7 +7,7 @@
 
 Client Redis nativo per Delphi con supporto completo per protocollo RESP, connection pooling, Pipeline, Pub/Sub, Scripting Lua e SSL/TLS. Implementato da zero senza dipendenze da progetti esterni, offre un'interfaccia pulita e intuitiva per tutte le operazioni Redis.
 
-[English](README.md) | **Italiano**
+**Italiano** | [English](README.md)
 
 ---
 

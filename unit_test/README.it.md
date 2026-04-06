@@ -8,6 +8,8 @@
 
 Suite di test DUnitX completa per **vmRedisClient**, un client Redis nativo scritto in Delphi con supporto a Redis 7.x e 8.x.
 
+**Italiano** | [English](README.md)
+
 ---
 
 ## Risultati
