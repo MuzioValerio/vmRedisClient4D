@@ -71,7 +71,7 @@ type
     procedure Disconnect;
     function  IsConnected: Boolean;
     procedure Send(const aData: TBytes);
-    procedure SendCommand(const aParts: array of string);
+    procedure (const aParts: array of string);
     procedure PipelineCommand(const aParts: array of string);
     function  FlushPipeline: TBytes;
     function  IsPipelining: Boolean;
@@ -353,19 +353,17 @@ end;
 
 procedure TRedisSynapseTransport.SendCommand(const aParts: array of string);
 begin
-  if Assigned(FLogger) then
+  var lCmdStr := '';
+  for var I := Low(aParts) to High(aParts) do
   begin
-    var lCmdStr := '';
-    for var I := Low(aParts) to High(aParts) do
-    begin
-      if I > Low(aParts) then lCmdStr := lCmdStr + ' ';
-      if (I > Low(aParts)) and (UpperCase(aParts[0]) = 'AUTH') then
-        lCmdStr := lCmdStr + '***'
-      else
-        lCmdStr := lCmdStr + aParts[I];
-    end;
-    FLogger.LogCommand(lCmdStr);
+    if I > Low(aParts) then 
+      lCmdStr := lCmdStr + ' ';
+    if (I > Low(aParts)) and (UpperCase(aParts[0]) = 'AUTH') then
+      lCmdStr := lCmdStr + '***'
+    else
+      lCmdStr := lCmdStr + aParts[I];
   end;
+  FLogger.LogCommand(lCmdStr);
 
   Send(TRedisCommandSerializer.Serialize(aParts));
 end;
@@ -382,8 +380,7 @@ begin
   Inc(FPipelineCount);
   FPipelining := True;
 
-  if Assigned(FLogger) then
-    FLogger.LogDebug(Format('Pipeline buffer: %d comandi accodati', [FPipelineCount]));
+  FLogger.LogDebug(Format('Pipeline buffer: %d comandi accodati', [FPipelineCount]));
 end;
 
 function TRedisSynapseTransport.FlushPipeline: TBytes;
@@ -407,8 +404,7 @@ begin
   FPipelineCount := 0;
   FPipelining := False;
 
-  if Assigned(FLogger) then
-    FLogger.LogDebug(Format('Pipeline flushed: %d comandi inviati', [lCount]));
+  FLogger.LogDebug(Format('Pipeline flushed: %d comandi inviati', [lCount]));
 end;
 
 function TRedisSynapseTransport.IsPipelining: Boolean;
