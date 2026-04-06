@@ -146,12 +146,12 @@ begin
   FConfig.ReadTimeout := 5000;
 
 // Utilizzo di Grijjy come Transport
-//  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'grijjy');
-//  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'grijjy');
+  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'grijjy');
+  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'grijjy');
 
   // Utilizzo Synapse come Transport
-  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'synapse');
-  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'synapse');
+//  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'synapse');
+//  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'synapse');
 
   FReceivedMessages := TList<TRedisPubSubMessage>.Create;
   FSystemMessages := TList<TRedisPubSubMessage>.Create;

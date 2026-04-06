@@ -52,23 +52,23 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   {$ENDIF }
   DUnitX.TestFramework,
-  Redis.Client.Intf in '..\..\sources\Redis.Client.Intf.pas',
-  Redis.Client in '..\..\sources\Redis.Client.pas',
-  Redis.Connection.Config in '..\..\sources\Redis.Connection.Config.pas',
-  Redis.HealthCheck in '..\..\sources\Redis.HealthCheck.pas',
-  Redis.Logger.Empty in '..\..\sources\Redis.Logger.Empty.pas',
-  Redis.Pool in '..\..\sources\Redis.Pool.pas',
-  Redis.Protocol in '..\..\sources\Redis.Protocol.pas',
-  Redis.PubSub in '..\..\sources\Redis.PubSub.pas',
-  Redis.Response in '..\..\sources\Redis.Response.pas',
-  Redis.Transport.Grijjy in '..\..\sources\Redis.Transport.Grijjy.pas',
-  Redis.Transport.Intf in '..\..\sources\Redis.Transport.Intf.pas',
-  Redis.Transport.Registry in '..\..\sources\Redis.Transport.Registry.pas',
-  Redis.Transport.Synapse in '..\..\sources\Redis.Transport.Synapse.pas',
-  Redis.Types in '..\..\sources\Redis.Types.pas',
   Redis.Client.Tests in 'Redis.Client.Tests.pas',
   Redis.Pool.Tests in 'Redis.Pool.Tests.pas',
-  Redis.PubSub.Tests in 'Redis.PubSub.Tests.pas';
+  Redis.PubSub.Tests in 'Redis.PubSub.Tests.pas',
+  Redis.Client.Intf in '..\sources\Redis.Client.Intf.pas',
+  Redis.Client in '..\sources\Redis.Client.pas',
+  Redis.Connection.Config in '..\sources\Redis.Connection.Config.pas',
+  Redis.HealthCheck in '..\sources\Redis.HealthCheck.pas',
+  Redis.Logger.Empty in '..\sources\Redis.Logger.Empty.pas',
+  Redis.Pool in '..\sources\Redis.Pool.pas',
+  Redis.Protocol in '..\sources\Redis.Protocol.pas',
+  Redis.PubSub in '..\sources\Redis.PubSub.pas',
+  Redis.Response in '..\sources\Redis.Response.pas',
+  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas',
+  Redis.Transport.Intf in '..\sources\Redis.Transport.Intf.pas',
+  Redis.Transport.Registry in '..\sources\Redis.Transport.Registry.pas',
+  Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas',
+  Redis.Types in '..\sources\Redis.Types.pas';
 
 {$R *.RES}
 

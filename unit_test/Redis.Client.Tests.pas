@@ -393,10 +393,10 @@ begin
   FConfig.ReadTimeout := 5000;
 
   // Utilizzo di Grijjy come Transport
-//  FClient := TRedisClient.New(FConfig, nil, 'grijjy');
+  FClient := TRedisClient.New(FConfig, nil, 'grijjy');
 
   // Utilizzo di Synapse come Transport
-  FClient := TRedisClient.New(FConfig, nil, 'synapse');
+//  FClient := TRedisClient.New(FConfig, nil, 'synapse');
 
   FClient.Connect;
 
@@ -450,7 +450,11 @@ begin
   lInvalidConfig.MaxRetries        := 1;
   lInvalidConfig.ConnectionTimeout := 1000;
 
+  // Utilizzo di Grijjy come Transport
   lInvalidClient := TRedisClient.New(lInvalidConfig, nil, 'grijjy');
+
+  // Utilizzo di Synapse come Transport
+//  lInvalidClient := TRedisClient.New(lInvalidConfig, nil, 'synapse');
 
   Assert.WillRaise(
     procedure

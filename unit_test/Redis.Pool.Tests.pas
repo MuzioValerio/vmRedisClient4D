@@ -168,10 +168,10 @@ begin
   FRedisConfig.ReadTimeout := 3000;
 
   // Utilizzo di Grijjy come Transport
-//  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, 'grijjy');
+  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, 'grijjy');
 
   // Utilizzo di Synapse come Transport
-  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, 'synapse');
+//  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, 'synapse');
 end;
 
 procedure TRedisPoolTests.TearDown;
@@ -350,10 +350,10 @@ begin
   lFastConfig.AcquireTimeout := 100;  // 100ms
 
   // Utilizzo di Grijjy come Transport
-//  lFastPool := TRedisConnectionPool.New(lFastConfig, FRedisConfig, nil, 'grijjy');
+  lFastPool := TRedisConnectionPool.New(lFastConfig, FRedisConfig, nil, 'grijjy');
 
   // Utilizzo di Synapse come Transport
-  lFastPool := TRedisConnectionPool.New(lFastConfig, FRedisConfig, nil, 'grijjy');
+//  lFastPool := TRedisConnectionPool.New(lFastConfig, FRedisConfig, nil, 'synapse');
 
   lFastPool.Initialize;
 
