@@ -71,7 +71,7 @@ type
     procedure Disconnect;
     function  IsConnected: Boolean;
     procedure Send(const aData: TBytes);
-    procedure (const aParts: array of string);
+    procedure SendCommand(const aParts: array of string);
     procedure PipelineCommand(const aParts: array of string);
     function  FlushPipeline: TBytes;
     function  IsPipelining: Boolean;
