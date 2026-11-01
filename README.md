@@ -96,9 +96,9 @@ git clone https://github.com/MuzioValerio/vmRedisClient4D.git
 Add to your Delphi project's **Library Path**:
 
 ```
-vmRedisClient\Source
-vmRedisClient\Synapse
-vmRedisClient\GrijjyFoundation
+vmRedisClient4D\sources
+vmRedisClient4D\synapse
+vmRedisClient4D\GrijjyFoundation
 ```
 
 ---
@@ -1148,8 +1148,8 @@ lRank := lClient.ZRevRank(BOARD, aPlayer);
 ### Project Structure
 
 ```
-vmRedisClient/
-├── Source/
+vmRedisClient4D/
+├── sources/
 │   ├── Redis.Client.Intf.pas            # IRedisClient interface
 │   ├── Redis.Client.pas                 # TRedisClient implementation
 │   ├── Redis.Connection.Config.pas      # TRedisConnectionConfig (managed record)
@@ -1164,14 +1164,14 @@ vmRedisClient/
 │   ├── Redis.Pool.pas                   # Pool + helper + statistics
 │   ├── Redis.PubSub.pas                 # Publisher, Subscriber, ListenerThread
 │   └── Redis.HealthCheck.pas            # TSimpleRedisLogger
-├── Synapse/
+├── synapse/
 ├── GrijjyFoundation/
-├── Examples/
+├── example/
 │   ├── ExampleConsole.dpr
 │   ├── ExamplePooling.dpr               # 8 pooling and concurrency patterns
 │   ├── ExamplePubSub.dpr                # 3 Pub/Sub patterns + Event Manager
 │   └── ExampleHealthCheck.dpr
-└── Tests/
+└── unit_test/
     ├── Redis.Client.Tests.pas
     ├── Redis.Pool.Tests.pas
     └── Redis.PubSub.Tests.pas
