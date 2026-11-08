@@ -23,6 +23,13 @@
   - Updated:   2026 - Migrazione a IRedisTransport (provider-agnostico),
                       New() accetta provider string, costruttore aggiornato,
                       rimossa dipendenza diretta da Redis.Transport.Synapse
+  - Updated:   08/11/2026 - Tracciamento dello stato della sessione (#3):
+                      TrackSessionState, chiamato da ExecuteAndParse, aggiorna
+                      FInTransaction, FWatching e FCurrentDb per SELECT, MULTI,
+                      EXEC, DISCARD, WATCH, UNWATCH e RESET (anche se inviati
+                      con ExecuteCommand). Nuovi metodi IsInTransaction,
+                      IsWatching, IsPipelineActive e CurrentDb (-1 = sconosciuto).
+                      Fix Scan: MATCH e COUNT inviati solo se valorizzati (#7)
 -----------------------------------------------------------------------------}
 
 unit Redis.Client;
@@ -47,6 +54,8 @@ type
     FParser: TRedisProtocolParser;
     FConfig: TRedisConnectionConfig;
     FInTransaction: Boolean;
+    FWatching: Boolean;
+    FCurrentDb: Integer;
     FLogger: IRedisLogger;
     FPipelineActive: Boolean;
     FPipelineCmdCount: Integer;
@@ -61,11 +70,19 @@ type
     function  FloatToRedis(aValue: Double): string;
     function  RedisToFloat(const aStr: string): Double;
     function  ParseScanResponse(aResponse: IRedisResponse): TRedisScanResult;
+    procedure TrackSessionState(const aParts: array of string; const aResponse: IRedisResponse);
   private
     // --- IRedisClient ---
     procedure Connect;
     procedure Disconnect;
     function  IsConnected: Boolean;
+
+    // --- Stato della Connessione e Database Corrente ---
+    function IsInTransaction: Boolean;
+    function IsWatching: Boolean;
+    function IsPipelineActive: Boolean;
+    function CurrentDb: Integer;
+
     function  Ping: Boolean;
     function  HealthCheckDetailed: TRedisHealthInfo;
     procedure LogHealthStatus;
@@ -240,6 +257,8 @@ begin
   FTransport := aTransport;
   FParser := TRedisProtocolParser.Create(FTransport);
   FInTransaction := False;
+  FWatching := False;
+  FCurrentDb := -1;
   FPipelineActive := False;
   FPipelineCmdCount := 0;
 end;
@@ -329,8 +348,60 @@ begin
   CheckConnection;
   FTransport.SendCommand(aParts);
   Result := FParser.Parse;
+
+  TrackSessionState(aParts, Result);
+
   if Result.IsError then
     raise ERedisCommandException.Create(Result.GetErrorMessage);
+end;
+
+procedure TRedisClient.TrackSessionState(const aParts: array of string; const aResponse: IRedisResponse);
+begin
+  if Length(aParts) = 0 then
+    Exit;
+
+  var lCmd := aParts[0].ToUpper;
+  var lOk := not aResponse.IsError;
+
+  // Dentro MULTI i comandi sono solo accodati (QUEUED): il db cambierà all'EXEC
+  if FInTransaction and (lCmd = 'SELECT') then
+  begin
+    FCurrentDb := -1;
+    Exit;
+  end;
+
+  if lCmd = 'SELECT' then
+  begin
+    if lOk and (Length(aParts) > 1) then
+      FCurrentDb := StrToIntDef(aParts[1], -1);
+  end
+  else if lCmd = 'MULTI' then
+  begin
+    if lOk then
+      FInTransaction := True;
+  end
+  else if (lCmd = 'EXEC') or (lCmd = 'DISCARD') then
+  begin
+    // Anche con errore (EXECABORT) la transazione è chiusa; EXEC e DISCARD annullano sempre i WATCH
+    FInTransaction := False;
+    FWatching := False;
+  end
+  else if lCmd = 'WATCH' then
+  begin
+    if lOk then
+      FWatching := True;
+  end
+  else if lCmd = 'UNWATCH' then
+    FWatching := False
+  else if lCmd = 'RESET' then
+  begin
+    if lOk then
+    begin
+      FInTransaction := False;
+      FWatching := False;
+      FCurrentDb := 0;
+    end;
+  end;
 end;
 
 // ---------------------------------------------------------------------------
@@ -340,6 +411,10 @@ end;
 procedure TRedisClient.Connect;
 begin
   FTransport.Connect;
+
+  FInTransaction := False;
+  FWatching := False;
+  FCurrentDb := FConfig.Database;
 end;
 
 procedure TRedisClient.Disconnect;
@@ -348,6 +423,8 @@ begin
     FTransport.Disconnect;
   finally
     FInTransaction := False;
+    FWatching := False;
+    FCurrentDb := -1;
     FPipelineActive := False;
     FPipelineCmdCount := 0;
   end;
@@ -356,6 +433,26 @@ end;
 function TRedisClient.IsConnected: Boolean;
 begin
   Result := FTransport.IsConnected;
+end;
+
+function TRedisClient.IsInTransaction: Boolean;
+begin
+  Result := FInTransaction;
+end;
+
+function TRedisClient.IsPipelineActive: Boolean;
+begin
+  Result := FPipelineActive;
+end;
+
+function TRedisClient.IsWatching: Boolean;
+begin
+  Result := FWatching;
+end;
+
+function TRedisClient.CurrentDb: Integer;
+begin
+  Result := FCurrentDb;
 end;
 
 function TRedisClient.Ping: Boolean;
@@ -606,7 +703,7 @@ begin
 end;
 
 function TRedisClient.PExpireAt(const aKey: string; aUnixTimestampMs: Int64): Boolean;
-begin 
+begin
   ValidateKey(aKey); 
   Result := ExecuteAndParse(['PEXPIREAT', aKey, IntToStr(aUnixTimestampMs)]).AsInteger = 1; 
 end;
@@ -694,10 +791,16 @@ begin
     lCmd.Add(IntToStr(aCursor));
 
     if aPattern <> '' then
-      lCmd.Add('MATCH'); lCmd.Add(aPattern);
+    begin
+      lCmd.Add('MATCH');
+      lCmd.Add(aPattern);
+    end;
 
     if aCount > 0 then
-      lCmd.Add('COUNT'); lCmd.Add(IntToStr(aCount));
+    begin
+      lCmd.Add('COUNT');
+      lCmd.Add(IntToStr(aCount));
+    end;
 
     Result := ParseScanResponse(ExecuteAndParse(lCmd.ToArray));
   finally 
@@ -724,7 +827,7 @@ end;
 function TRedisClient.IncrBy(const aKey: string; aIncrement: Int64): Int64;
 begin 
   ValidateKey(aKey); 
-  Result := ExecuteAndParse(['INCRBY', aKey, IntToStr(aIncrement)]).AsInteger; 
+  Result := ExecuteAndParse(['INCRBY', aKey, IntToStr(aIncrement)]).AsInteger;
 end;
 
 function TRedisClient.IncrByFloat(const aKey: string; aIncrement: Double): Double;
@@ -896,7 +999,7 @@ begin
 end;
 
 function TRedisClient.SRem(const aKey: string; const aMembers: array of string): Integer;
-begin 
+begin
   ValidateKey(aKey); 
   var lCmd := BuildCommandArray('SREM', aKey, aMembers); 
   try 
@@ -1068,7 +1171,7 @@ begin
     for var K in aKeys do 
       lCmd.Add(K); 
     Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
-  finally 
+  finally
     lCmd.Free; 
   end;
 end;
@@ -1154,7 +1257,7 @@ begin
     raise ERedisValidationException.Create('Specificare almeno un campo');
   var lCmd := BuildCommandArray('HDEL', aKey, aFields);
   try 
-    Result := ExecuteAndParse(lCmd.ToArray).AsInteger; 
+    Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
   finally 
     lCmd.Free; 
   end;
@@ -1369,7 +1472,7 @@ begin
   ValidateKey(aKey);
   var lCmd := TList<string>.Create;
   try
-    lCmd.Add('ZRANGEBYSCORE'); 
+    lCmd.Add('ZRANGEBYSCORE');
     lCmd.Add(aKey); 
     lCmd.Add(aMin); 
     lCmd.Add(aMax);
@@ -1412,7 +1515,7 @@ end;
 
 function TRedisClient.ZPopMin(const aKey: string; aCount: Integer): TArray<string>;
 begin 
-  ValidateKey(aKey); 
+  ValidateKey(aKey);
   Result := ResponseToStringArray(ExecuteAndParse(['ZPOPMIN', aKey, IntToStr(aCount)])); 
 end;
 
@@ -1455,7 +1558,7 @@ begin
     end;
     if aCount > 0 then 
     begin 
-      lCmd.Add('COUNT'); 
+      lCmd.Add('COUNT');
       lCmd.Add(IntToStr(aCount)); 
     end;
     Result := ParseScanResponse(ExecuteAndParse(lCmd.ToArray));
@@ -1484,7 +1587,7 @@ begin
   ValidateKeys(aKeys);
   var lCmd := TList<string>.Create;
   try 
-    lCmd.Add('PFCOUNT'); 
+    lCmd.Add('PFCOUNT');
     for var K in aKeys do 
       lCmd.Add(K); 
     Result := ExecuteAndParse(lCmd.ToArray).AsInteger;
@@ -1498,7 +1601,7 @@ begin
   ValidateKey(aDstKey); ValidateKeys(aSrcKeys);
   var lCmd := TList<string>.Create;
   try 
-    lCmd.Add('PFMERGE'); 
+    lCmd.Add('PFMERGE');
     lCmd.Add(aDstKey); 
     for var K in aSrcKeys do 
       lCmd.Add(K); 
@@ -1581,11 +1684,13 @@ begin
   CheckConnection;
   FTransport.PipelineCommand(aParts);
   Inc(FPipelineCmdCount);
+  if (Length(aParts) > 0) and (SameText(aParts[0], 'SELECT')) then
+    FCurrentDb := -1;
 end;
 
 function TRedisClient.ExecPipeline: TArray<IRedisResponse>;
 begin
-  if not FPipelineActive then 
+  if not FPipelineActive then
     raise ERedisPipelineException.Create('Pipeline non attiva');
   var lCount := FPipelineCmdCount;
   try
@@ -1627,7 +1732,7 @@ begin
     lCmd.Add('EVALSHA'); 
     lCmd.Add(aSha); 
     lCmd.Add(IntToStr(Length(aKeys)));
-    for var K in aKeys do 
+    for var K in aKeys do
       lCmd.Add(K);
     for var A in aArgs do 
       lCmd.Add(A);

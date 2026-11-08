@@ -1,0 +1,71 @@
+{-----------------------------------------------------------------------------
+ Project: vmRedisClient4D
+ Unit Name: vmRedisClient4D.Transport.Grijjy.dpk
+ Copyright (C) 2025-2030 Muzio Valerio
+ Author: Muzio Valerio
+ Date: 01-nov-2026
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+
+ Info:
+  - Package runtime del transport 'grijjy' (GrijjyFoundation).
+  - Richiede il package vmRedisClient4D.
+  - Solo Windows: contiene Grijjy.SocketPool.Win (su Linux servirebbe
+    Grijjy.SocketPool.Linux, non disponibile con Delphi CE).
+-----------------------------------------------------------------------------}
+
+package vmRedisClient4D.Transport.Grijjy;
+
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'vmRedisClient4D - GrijjyFoundation transport'}
+{$LIBSUFFIX AUTO}
+{$RUNONLY}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl,
+  vmRedisClient4D;
+
+contains
+  Grijjy.Collections in '..\GrijjyFoundation\Grijjy.Collections.pas',
+  Grijjy.MemoryPool in '..\GrijjyFoundation\Grijjy.MemoryPool.pas',
+  Grijjy.Winsock2 in '..\GrijjyFoundation\Grijjy.Winsock2.pas',
+  Grijjy.OpenSSL.API in '..\GrijjyFoundation\Grijjy.OpenSSL.API.pas',
+  Grijjy.OpenSSL in '..\GrijjyFoundation\Grijjy.OpenSSL.pas',
+  Grijjy.SocketPool.Win in '..\GrijjyFoundation\Grijjy.SocketPool.Win.pas',
+  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas';
+
+end.

@@ -93,6 +93,10 @@ Native Redis client for Delphi with full support for the RESP protocol, connecti
 git clone https://github.com/MuzioValerio/vmRedisClient4D.git
 ```
 
+You can use the library in two ways: by adding the sources to your project, or by building the runtime packages.
+
+### Option 1 — Sources
+
 Add to your Delphi project's **Library Path**:
 
 ```
@@ -100,6 +104,29 @@ vmRedisClient4D\sources
 vmRedisClient4D\synapse
 vmRedisClient4D\GrijjyFoundation
 ```
+
+### Option 2 — Runtime packages
+
+The `packages` folder contains three runtime-only packages (the library has no design-time components). The core does not depend on Synapse or GrijjyFoundation: each transport is a separate package, so you build only the ones you need.
+
+| Package | Contents | Requires |
+|---|---|---|
+| `vmRedisClient4D` | Client, pool, Pub/Sub, protocol, transport registry | `rtl` |
+| `vmRedisClient4D.Transport.Synapse` | `synapse` transport + the Synapse units it uses | `vmRedisClient4D` |
+| `vmRedisClient4D.Transport.Grijjy` | `grijjy` transport + the GrijjyFoundation units it uses (Windows only) | `vmRedisClient4D` |
+
+1. Open `packages\vmRedisClient4D.groupproj` in the IDE. The packages need no Library Path configuration: their units are referenced with relative paths.
+2. Select the platform (Win32 or Win64) and the configuration (Debug or Release), then run **Build All**. There is nothing to *Install*, because the packages are runtime-only.
+3. Add the compiled units to the **Library Path** (*Tools > Options > Language > Delphi > Library*), for each platform you use:
+   ```
+   vmRedisClient4D\packages\$(Platform)\Release
+   ```
+   and `vmRedisClient4D\sources` to the **Browsing Path**, so the IDE can navigate to the sources.
+4. In your application, add the units to the `uses` clause as usual (for example `Redis.Client` and `Redis.Transport.Synapse`).
+
+You can then link the library statically, which is the default and needs no extra files, or **with runtime packages**: in *Project > Options > Packages > Runtime Packages* enable *Link with runtime packages* and add `vmRedisClient4D` plus the transport packages you use. In that case distribute the corresponding `.bpl` files with your executable. The file name includes the compiler version (`{$LIBSUFFIX AUTO}`), for example `vmRedisClient4D370.bpl` with Delphi 13.
+
+> **Delphi Community Edition:** the packages are built from the IDE, as described above (CE has no command-line compiler).
 
 ---
 
@@ -579,7 +606,7 @@ end;
 lSize := lClient.DbSize;
 lInfo := lClient.Info('server');
 lClient.FlushDb(False);               // False=synchronous, True=asynchronous
-lClient.Select(2);                    // ⚠️ do not use on pooled connections
+lClient.Select(2);                    // on pooled connections prefer AcquireConnectionOnDb
 
 lClient.ClientSetName('my-app');
 lName := lClient.ClientGetName;
@@ -595,6 +622,19 @@ lClient.ConfigSet('hz', '15');
 lResponse := lClient.ExecuteCommand(['OBJECT', 'ENCODING', 'mykey']);
 lResponse := lClient.ExecuteCommand(['XLEN', 'mystream']);
 ```
+
+### Session State
+
+The client tracks the state of its own session. `SELECT`, `MULTI`, `EXEC`, `DISCARD`, `WATCH`, `UNWATCH` and `RESET` are tracked even when sent through `ExecuteCommand`. The connection pool reads this state when a connection is released.
+
+```delphi
+lClient.IsInTransaction;   // True between Multi and Exec/Discard
+lClient.IsWatching;        // True after Watch, until Unwatch/Exec/Discard
+lClient.IsPipelineActive;  // True between BeginPipeline and ExecPipeline
+lClient.CurrentDb;         // selected database; -1 = unknown
+```
+
+`CurrentDb` is `-1` before `Connect`, after `Disconnect`, and after a `SELECT` sent inside `MULTI` or a pipeline (the database changes only when the queued commands run).
 
 ---
 
@@ -878,7 +918,7 @@ The pool is managed by `TRedisConnectionPool` (implements `IRedisConnectionPool`
 - **IsHealthy** — checks that the connection responds correctly
 - **IdleTimeMs** — how long it has been idle
 - **ErrorCount** — consecutive errors (threshold 3 → automatic removal)
-- **CurrentDb** — currently selected database (for automatic `SELECT`)
+- **CurrentDb** — currently selected database, read from `IRedisClient.CurrentDb` (for automatic `SELECT`)
 
 ### Configuration
 
@@ -896,6 +936,7 @@ var
   // IdleTimeout        = 300000 ms (5 minutes)
   // ValidationInterval = 30000 ms
   // EnableHealthCheck  = True
+  // ResetOnRelease     = False
 
   lPool: IRedisConnectionPool;
 begin
@@ -976,7 +1017,27 @@ finally
 end;
 ```
 
-> ⚠️ Do not call `lClient.Select()` manually on pooled connections: use `AcquireConnectionOnDb` instead.
+> 💡 Prefer `AcquireConnectionOnDb` to a manual `lClient.Select()`. A manual `Select` is still safe: the client tracks it, and the next `AcquireConnection` moves the connection back to the configured database.
+
+### Connection State on Release
+
+When a connection is released, `ReleaseConnection` checks the session state of the client:
+
+| State at release | What the pool does |
+|---|---|
+| `MULTI` not closed with `Exec`/`Discard` | Destroys the connection |
+| `WATCH` still active | Destroys the connection |
+| Pipeline started and not executed | Destroys the connection |
+| Database changed with `Select` | Keeps the connection; the next acquire issues `SELECT` if needed |
+| Clean | Returns the connection to the pool |
+
+A destroyed connection is replaced by a new one on the next acquire.
+
+**`ResetOnRelease`** (default `False`): sends `RESET` (Redis 6.2+) every time a clean connection is released. `RESET` also closes Pub/Sub mode and clears anything else the caller left on the session. The pool then repeats `AUTH` and `CLIENT SETNAME` from the connection configuration. It costs one extra round trip per release (two with a password, three with a client name). If `RESET` fails, the connection is destroyed.
+
+```delphi
+lPoolConfig.ResetOnRelease := True;
+```
 
 ### Statistics and Monitoring
 
@@ -1044,6 +1105,7 @@ TRedisThreadHelper.WorkerThread(lPool, ThreadNum, Iterations);
 - ✅ Use `IRedisLogger` to trace automatic removal of non-healthy connections
 - ✅ Monitor `WaitingRequests` and `AverageAcquireTimeMs` in production
 - ✅ Use `AcquireConnectionOnDb` instead of manual `Select`
+- ✅ Close every `Multi` with `Exec` or `Discard` before releasing: otherwise the pool destroys the connection
 
 ---
 
@@ -1164,6 +1226,7 @@ vmRedisClient4D/
 │   ├── Redis.Pool.pas                   # Pool + helper + statistics
 │   ├── Redis.PubSub.pas                 # Publisher, Subscriber, ListenerThread
 │   └── Redis.HealthCheck.pas            # TSimpleRedisLogger
+├── packages/                          # runtime packages + vmRedisClient4D.groupproj
 ├── synapse/
 ├── GrijjyFoundation/
 ├── example/
@@ -1321,6 +1384,7 @@ WriteLn(lConfig.ToConnectionString);
 - [x] **Grijjy transport** — `TRedisGrijjyTransport` cross-platform with async I/O and native SSL
 - [x] `TRedisClient.New` with optional `aProvider` parameter (`'synapse'` default, `'grijjy'` available)
 - [x] Linux/macOS/iOS/Android support via the Grijjy provider
+- [x] Session state on `IRedisClient` (`IsInTransaction`, `IsWatching`, `IsPipelineActive`, `CurrentDb`); the pool no longer reuses connections left with `MULTI`/`WATCH` open, and offers `ResetOnRelease`
 
 ### Planned
 - [ ] Redis Streams (XADD, XREAD, XGROUP, XACK)

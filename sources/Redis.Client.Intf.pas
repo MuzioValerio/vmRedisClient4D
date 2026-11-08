@@ -21,6 +21,8 @@
  Purpose:
  History:
   - Updated:   2026 - Rimossa dipendenza da Redis.Transport.Synapse.
+  - Updated:   08/11/2026 - Aggiunti IsInTransaction, IsWatching, IsPipelineActive
+                      e CurrentDb, letti dal pool al rilascio della connessione (#3).
 -----------------------------------------------------------------------------}
 
 unit Redis.Client.Intf;
@@ -44,6 +46,15 @@ type
     procedure Connect;
     procedure Disconnect;
     function IsConnected: Boolean;
+
+    // =========================================================================
+    // Stato della Connessione e Database Corrente
+    // =========================================================================
+    function IsInTransaction: Boolean;
+    function IsWatching: Boolean;
+    function IsPipelineActive: Boolean;
+    function CurrentDb: Integer;
+
     function Ping: Boolean;
     function HealthCheckDetailed: TRedisHealthInfo;
     procedure LogHealthStatus;

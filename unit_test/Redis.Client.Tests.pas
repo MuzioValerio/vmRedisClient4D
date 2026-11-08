@@ -38,6 +38,9 @@
  Purpose:
  History:
   - Updated: 2026 - Aggiornamento completo per Redis 8.x
+  - Updated: 08/11/2026 - Test Scan senza pattern/count (#7) e test dello
+              stato della sessione: CurrentDb, IsInTransaction, IsWatching,
+              IsPipelineActive (#3)
 
 -----------------------------------------------------------------------------}
 
@@ -148,6 +151,10 @@ type
     procedure Test_Keys_MatchPattern;
     [Test]
     procedure Test_Scan_WithPattern;
+    [Test]
+    procedure Test_Scan_WithoutPatternAndCount;
+    [Test]
+    procedure Test_Scan_WithoutCount;
 
     // -------------------------------------------------------------------------
     // Test Stringhe
@@ -376,6 +383,34 @@ type
     procedure Test_Validation_NegativeExpiration;
     [Test]
     procedure Test_Validation_EmptyArray;
+
+    // -------------------------------------------------------------------------
+    // Test Stato della Sessione (#3)
+    // -------------------------------------------------------------------------
+    [Test]
+    procedure Test_SessionState_CurrentDb_AfterConnect;
+    [Test]
+    procedure Test_SessionState_CurrentDb_AfterSelect;
+    [Test]
+    procedure Test_SessionState_CurrentDb_AfterExecuteCommandSelect;
+    [Test]
+    procedure Test_SessionState_CurrentDb_FailedSelectKeepsDb;
+    [Test]
+    procedure Test_SessionState_CurrentDb_SelectInsideMultiIsUnknown;
+    [Test]
+    procedure Test_SessionState_CurrentDb_SelectInPipelineIsUnknown;
+    [Test]
+    procedure Test_SessionState_InTransaction_MultiExec;
+    [Test]
+    procedure Test_SessionState_InTransaction_MultiDiscard;
+    [Test]
+    procedure Test_SessionState_Watching_WatchUnwatch;
+    [Test]
+    procedure Test_SessionState_Watching_ClearedByExec;
+    [Test]
+    procedure Test_SessionState_PipelineActive;
+    [Test]
+    procedure Test_SessionState_Disconnect_ResetsState;
   end;
 
 implementation
@@ -973,6 +1008,72 @@ begin
   Assert.IsTrue(Length(lKeys) >= 3, 'KEYS dovrebbe trovare almeno 3 chiavi');
 
   FClient.Del([PREFIX + 'a', PREFIX + 'b', PREFIX + 'c']);
+end;
+
+procedure TRedisClientTests.Test_Scan_WithoutCount;
+const
+  Prefix = 'test:scan:nocount';
+var
+  lScan: TRedisScanResult;
+  lAll: TStringList;
+  I: integer;
+begin
+  for I := 1 to 3 do
+    FClient.SetValue(Prefix + IntToStr(I), 'v' + IntToStr(I));
+
+  lAll := TStringList.Create;
+  try
+    var lCursor: int64 := 0;
+    repeat
+      lScan := FClient.Scan(lCursor, '', 0);
+      lCursor := lScan.Cursor;
+      for var lItem in lScan.Items do
+      begin
+        lAll.Add(lItem);
+      end;
+    until (lCursor = 0);
+
+    for I := 1 to 3 do
+      Assert.AreEqual(3, lAll.Count, 'SCAN con pattern e senza count dovrebbe trovare esattamente 3 chiavi');
+  finally
+    lAll.Free;
+  end;
+
+  for I := 1 to 3 do
+     FClient.Del([Prefix + IntToStr(I)]);
+end;
+
+procedure TRedisClientTests.Test_Scan_WithoutPatternAndCount;
+const
+  Prefix = 'test:scan:nopattern';
+var
+  lScan: TRedisScanResult;
+  lAll: TStringList;
+  I: integer;
+begin
+  for I := 1 to 3 do
+    FClient.SetValue(Prefix + IntToStr(I), 'v' + IntToStr(I));
+
+  lAll := TStringList.Create;
+  try
+    var lCursor: int64 := 0;
+    repeat
+      lScan := FClient.Scan(lCursor, '', 0);
+      lCursor := lScan.Cursor;
+      for var lItem in lScan.Items do
+      begin
+        lAll.Add(lItem);
+      end;
+    until (lCursor = 0);
+
+    for I := 1 to 3 do
+      Assert.IsTrue(lAll.IndexOf(PREFIX + IntToStr(I)) >= 0, 'SCAN senza pattern dovrebbe trovare ' + PREFIX + IntToStr(I));
+  finally
+    lAll.Free;
+  end;
+
+  for I := 1 to 3 do
+     FClient.Del([Prefix + IntToStr(I)]);
 end;
 
 procedure TRedisClientTests.Test_Scan_WithPattern;
@@ -2474,6 +2575,155 @@ begin
     ERedisValidationException,
     'Dovrebbe sollevare eccezione per array vuoto'
   );
+end;
+
+{$ENDREGION}
+
+{$REGION 'Test Stato della Sessione'}
+
+procedure TRedisClientTests.Test_SessionState_CurrentDb_AfterConnect;
+begin
+  // Setup usa TRedisConnectionConfig.Localhost(0)
+  Assert.AreEqual(0, FClient.CurrentDb,      'Dopo Connect CurrentDb dovrebbe essere il db della configurazione');
+  Assert.IsFalse(FClient.IsInTransaction,    'Dopo Connect non dovrebbe esserci una transazione');
+  Assert.IsFalse(FClient.IsWatching,         'Dopo Connect non dovrebbero esserci WATCH');
+  Assert.IsFalse(FClient.IsPipelineActive,   'Dopo Connect non dovrebbe esserci una pipeline');
+end;
+
+procedure TRedisClientTests.Test_SessionState_CurrentDb_AfterSelect;
+begin
+  try
+    FClient.Select(3);
+    Assert.AreEqual(3, FClient.CurrentDb, 'Dopo Select(3) CurrentDb dovrebbe essere 3');
+  finally
+    FClient.Select(0);
+  end;
+
+  Assert.AreEqual(0, FClient.CurrentDb, 'Dopo Select(0) CurrentDb dovrebbe essere 0');
+end;
+
+procedure TRedisClientTests.Test_SessionState_CurrentDb_AfterExecuteCommandSelect;
+begin
+  // SELECT inviato come comando generico, anche in minuscolo
+  try
+    FClient.ExecuteCommand(['select', '4']);
+    Assert.AreEqual(4, FClient.CurrentDb, 'Una SELECT tramite ExecuteCommand dovrebbe aggiornare CurrentDb');
+  finally
+    FClient.Select(0);
+  end;
+end;
+
+procedure TRedisClientTests.Test_SessionState_CurrentDb_FailedSelectKeepsDb;
+begin
+  Assert.WillRaise(
+    procedure
+    begin
+      FClient.Select(9999);   // fuori dal range "databases" del server
+    end,
+    ERedisCommandException,
+    'Select su un db inesistente dovrebbe sollevare ERedisCommandException'
+  );
+
+  Assert.AreEqual(0, FClient.CurrentDb, 'Una SELECT fallita non dovrebbe cambiare CurrentDb');
+end;
+
+procedure TRedisClientTests.Test_SessionState_CurrentDb_SelectInsideMultiIsUnknown;
+begin
+  try
+    FClient.Multi;
+    FClient.Select(3);   // risponde QUEUED: il db cambierà solo all'EXEC
+
+    Assert.AreEqual(-1, FClient.CurrentDb, 'Una SELECT dentro MULTI dovrebbe rendere CurrentDb sconosciuto (-1)');
+
+    FClient.Exec;
+  finally
+    FClient.Select(0);
+  end;
+
+  Assert.AreEqual(0, FClient.CurrentDb, 'Dopo Select(0) CurrentDb dovrebbe essere di nuovo noto');
+end;
+
+procedure TRedisClientTests.Test_SessionState_CurrentDb_SelectInPipelineIsUnknown;
+begin
+  try
+    FClient.BeginPipeline;
+    FClient.PipelineCommand(['SELECT', '3']);
+
+    Assert.AreEqual(-1, FClient.CurrentDb, 'Una SELECT in pipeline dovrebbe rendere CurrentDb sconosciuto (-1)');
+
+    FClient.ExecPipeline;
+  finally
+    FClient.Select(0);
+  end;
+end;
+
+procedure TRedisClientTests.Test_SessionState_InTransaction_MultiExec;
+begin
+  Assert.IsFalse(FClient.IsInTransaction, 'Prima di Multi non dovrebbe esserci una transazione');
+
+  FClient.Multi;
+  Assert.IsTrue(FClient.IsInTransaction, 'Dopo Multi IsInTransaction dovrebbe essere True');
+
+  FClient.SetValue('test:session:tx', 'v');
+  FClient.Exec;
+  Assert.IsFalse(FClient.IsInTransaction, 'Dopo Exec IsInTransaction dovrebbe essere False');
+end;
+
+procedure TRedisClientTests.Test_SessionState_InTransaction_MultiDiscard;
+begin
+  FClient.Multi;
+  Assert.IsTrue(FClient.IsInTransaction, 'Dopo Multi IsInTransaction dovrebbe essere True');
+
+  FClient.Discard;
+  Assert.IsFalse(FClient.IsInTransaction, 'Dopo Discard IsInTransaction dovrebbe essere False');
+end;
+
+procedure TRedisClientTests.Test_SessionState_Watching_WatchUnwatch;
+begin
+  Assert.IsFalse(FClient.IsWatching, 'Prima di Watch IsWatching dovrebbe essere False');
+
+  FClient.Watch(['test:session:watch']);
+  Assert.IsTrue(FClient.IsWatching, 'Dopo Watch IsWatching dovrebbe essere True');
+
+  FClient.Unwatch;
+  Assert.IsFalse(FClient.IsWatching, 'Dopo Unwatch IsWatching dovrebbe essere False');
+end;
+
+procedure TRedisClientTests.Test_SessionState_Watching_ClearedByExec;
+begin
+  FClient.Watch(['test:session:watch']);
+  FClient.Multi;
+  FClient.SetValue('test:session:watch', 'v');
+  FClient.Exec;
+
+  Assert.IsFalse(FClient.IsWatching,      'EXEC annulla sempre i WATCH: IsWatching dovrebbe essere False');
+  Assert.IsFalse(FClient.IsInTransaction, 'Dopo Exec IsInTransaction dovrebbe essere False');
+end;
+
+procedure TRedisClientTests.Test_SessionState_PipelineActive;
+begin
+  Assert.IsFalse(FClient.IsPipelineActive, 'Prima di BeginPipeline IsPipelineActive dovrebbe essere False');
+
+  FClient.BeginPipeline;
+  Assert.IsTrue(FClient.IsPipelineActive, 'Dopo BeginPipeline IsPipelineActive dovrebbe essere True');
+
+  FClient.PipelineCommand(['PING']);
+  FClient.ExecPipeline;
+  Assert.IsFalse(FClient.IsPipelineActive, 'Dopo ExecPipeline IsPipelineActive dovrebbe essere False');
+end;
+
+procedure TRedisClientTests.Test_SessionState_Disconnect_ResetsState;
+begin
+  FClient.Select(3);
+  FClient.Watch(['test:session:watch']);
+
+  FClient.Disconnect;
+  Assert.AreEqual(-1, FClient.CurrentDb, 'Dopo Disconnect CurrentDb dovrebbe essere sconosciuto (-1)');
+  Assert.IsFalse(FClient.IsWatching,     'Dopo Disconnect IsWatching dovrebbe essere False');
+
+  // Riconnessione: si torna al db della configurazione (serve anche al TearDown)
+  FClient.Connect;
+  Assert.AreEqual(0, FClient.CurrentDb, 'Dopo Connect CurrentDb dovrebbe essere il db della configurazione');
 end;
 
 {$ENDREGION}

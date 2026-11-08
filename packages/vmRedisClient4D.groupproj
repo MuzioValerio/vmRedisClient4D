@@ -1,0 +1,60 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <ProjectGuid>{D064DB36-770B-4B5C-9062-A1BB20B1E37B}</ProjectGuid>
+    </PropertyGroup>
+    <ItemGroup>
+        <Projects Include="vmRedisClient4D.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="vmRedisClient4D.Transport.Synapse.dproj">
+            <Dependencies>vmRedisClient4D.dproj</Dependencies>
+        </Projects>
+        <Projects Include="vmRedisClient4D.Transport.Grijjy.dproj">
+            <Dependencies>vmRedisClient4D.dproj</Dependencies>
+        </Projects>
+    </ItemGroup>
+    <ProjectExtensions>
+        <Borland.Personality>Default.Personality.12</Borland.Personality>
+        <Borland.ProjectType/>
+        <BorlandProject>
+            <Default.Personality/>
+        </BorlandProject>
+    </ProjectExtensions>
+    <Target Name="vmRedisClient4D">
+        <MSBuild Projects="vmRedisClient4D.dproj"/>
+    </Target>
+    <Target Name="vmRedisClient4D:Clean">
+        <MSBuild Projects="vmRedisClient4D.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="vmRedisClient4D:Make">
+        <MSBuild Projects="vmRedisClient4D.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="vmRedisClient4D_Transport_Synapse" DependsOnTargets="vmRedisClient4D">
+        <MSBuild Projects="vmRedisClient4D.Transport.Synapse.dproj"/>
+    </Target>
+    <Target Name="vmRedisClient4D_Transport_Synapse:Clean" DependsOnTargets="vmRedisClient4D:Clean">
+        <MSBuild Projects="vmRedisClient4D.Transport.Synapse.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="vmRedisClient4D_Transport_Synapse:Make" DependsOnTargets="vmRedisClient4D:Make">
+        <MSBuild Projects="vmRedisClient4D.Transport.Synapse.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="vmRedisClient4D_Transport_Grijjy" DependsOnTargets="vmRedisClient4D">
+        <MSBuild Projects="vmRedisClient4D.Transport.Grijjy.dproj"/>
+    </Target>
+    <Target Name="vmRedisClient4D_Transport_Grijjy:Clean" DependsOnTargets="vmRedisClient4D:Clean">
+        <MSBuild Projects="vmRedisClient4D.Transport.Grijjy.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="vmRedisClient4D_Transport_Grijjy:Make" DependsOnTargets="vmRedisClient4D:Make">
+        <MSBuild Projects="vmRedisClient4D.Transport.Grijjy.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="Build">
+        <CallTarget Targets="vmRedisClient4D;vmRedisClient4D_Transport_Synapse;vmRedisClient4D_Transport_Grijjy"/>
+    </Target>
+    <Target Name="Clean">
+        <CallTarget Targets="vmRedisClient4D:Clean;vmRedisClient4D_Transport_Synapse:Clean;vmRedisClient4D_Transport_Grijjy:Clean"/>
+    </Target>
+    <Target Name="Make">
+        <CallTarget Targets="vmRedisClient4D:Make;vmRedisClient4D_Transport_Synapse:Make;vmRedisClient4D_Transport_Grijjy:Make"/>
+    </Target>
+    <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
+</Project>

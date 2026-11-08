@@ -25,6 +25,10 @@
   - Updated: 2026 - Aggiornamento per fix SELECT database nelle connessioni pooled
               - Test AcquireConnectionOnDb
               - Test isolamento database tra connessioni
+  - Updated: 08/11/2026 - Transport scelto in un solo campo (FTransport)
+              - Test slot non persi con db non valido (#6)
+              - Test stato della connessione al rilascio: Select del chiamante,
+                MULTI/WATCH aperti, ResetOnRelease (#3)
 
 -----------------------------------------------------------------------------}
 
@@ -51,6 +55,10 @@ type
     FPool: IRedisConnectionPool;
     FPoolConfig: TRedisPoolConfig;
     FRedisConfig: TRedisConnectionConfig;
+    FTransport: string;
+
+    /// Pool con una sola connessione: la riacquisizione restituisce sempre la stessa
+    function NewSingleConnectionPool(aResetOnRelease: Boolean): IRedisConnectionPool;
   public
     [Setup]
     procedure Setup;
@@ -66,6 +74,8 @@ type
     procedure Test_PoolConfig_Validation_InvalidMin;
     [Test]
     procedure Test_PoolConfig_Validation_MaxLessThanMin;
+    [Test]
+    procedure Test_PoolConfig_ResetOnRelease_DefaultAndCopy;
 
     // -------------------------------------------------------------------------
     // Test Inizializzazione
@@ -104,6 +114,20 @@ type
     procedure Test_Pool_AcquireOnDb_IsolationBetweenDbs;
     [Test]
     procedure Test_Pool_AcquireOnDb_ReleasedConnectionRestoredToDb0;
+    [Test]
+    procedure Test_Pool_AcquireOnDb_InvalidDb_DoesNotLeakSlots;
+
+    // -------------------------------------------------------------------------
+    // Test Stato della connessione al rilascio (#3)
+    // -------------------------------------------------------------------------
+    [Test]
+    procedure Test_Pool_Release_AfterClientSelect_DbRestored;
+    [Test]
+    procedure Test_Pool_Release_WithOpenMulti_DestroysConnection;
+    [Test]
+    procedure Test_Pool_Release_WithOpenWatch_DestroysConnection;
+    [Test]
+    procedure Test_Pool_ResetOnRelease_ResetsStateAndKeepsConnection;
 
     // -------------------------------------------------------------------------
     // Test Concorrenza
@@ -168,10 +192,23 @@ begin
   FRedisConfig.ReadTimeout := 3000;
 
   // Utilizzo di Grijjy come Transport
-  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, 'grijjy');
+  FTransport := 'grijjy';
 
   // Utilizzo di Synapse come Transport
-//  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, 'synapse');
+//  FTransport := 'synapse';
+
+  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, FTransport);
+end;
+
+function TRedisPoolTests.NewSingleConnectionPool(aResetOnRelease: Boolean): IRedisConnectionPool;
+begin
+  var lConfig := FPoolConfig;
+  lConfig.MinConnections := 1;
+  lConfig.MaxConnections := 1;
+  lConfig.ResetOnRelease := aResetOnRelease;
+
+  Result := TRedisConnectionPool.New(lConfig, FRedisConfig, nil, FTransport);
+  Result.Initialize;
 end;
 
 procedure TRedisPoolTests.TearDown;
@@ -224,6 +261,18 @@ begin
     end,
     Exception, 'Dovrebbe sollevare eccezione se MaxConnections < MinConnections'
   );
+end;
+
+procedure TRedisPoolTests.Test_PoolConfig_ResetOnRelease_DefaultAndCopy;
+var
+  lConfig, lCopy: TRedisPoolConfig;
+begin
+  Assert.IsFalse(lConfig.ResetOnRelease, 'Default ResetOnRelease dovrebbe essere False');
+
+  // L'operatore Assign copia i campi uno per uno: ResetOnRelease non deve perdersi
+  lConfig.ResetOnRelease := True;
+  lCopy := lConfig;
+  Assert.IsTrue(lCopy.ResetOnRelease, 'ResetOnRelease dovrebbe essere copiato da Assign');
 end;
 
 {$ENDREGION}
@@ -484,6 +533,149 @@ begin
 
   lClientDb0.Del([TEST_KEY]);
   FPool.ReleaseConnection(lClientDb0);
+end;
+
+procedure TRedisPoolTests.Test_Pool_AcquireOnDb_InvalidDb_DoesNotLeakSlots;
+const
+  INVALID_DB = 9999; // fuori dal range "databases" del server (default 16)
+var
+  lClient: IRedisClient;
+begin
+  FPool.Initialize;
+
+  // Ogni SELECT fallita non deve lasciare la connessione marcata InUse (#6).
+  // Con il bug, dopo MaxConnections tentativi il pool è saturo e la chiamata
+  // successiva va in timeout (ERedisTimeoutException invece di ERedisConnectionException).
+  for var I := 1 to FPoolConfig.MaxConnections + 1 do
+    Assert.WillRaise(
+      procedure
+      begin
+        FPool.AcquireConnectionOnDb(INVALID_DB);
+      end,
+      ERedisConnectionException,
+      Format('Tentativo %d: AcquireConnectionOnDb(%d) dovrebbe sollevare ERedisConnectionException', [I, INVALID_DB]));
+
+  // Il pool deve essere ancora utilizzabile
+  lClient := FPool.AcquireConnectionOnDb(1);
+  Assert.IsNotNull(lClient,          'Dopo le SELECT fallite il pool dovrebbe ancora fornire connessioni');
+  Assert.IsTrue(lClient.IsConnected, 'Client dovrebbe essere connesso');
+
+  FPool.ReleaseConnection(lClient);
+end;
+
+{$ENDREGION}
+
+{$REGION 'Test Stato della connessione al rilascio'}
+
+procedure TRedisPoolTests.Test_Pool_Release_AfterClientSelect_DbRestored;
+const
+  TEST_KEY = 'test:pool:dirtydb:key';
+var
+  lPool: IRedisConnectionPool;
+  lFirst, lSecond: IRedisClient;
+begin
+  lPool := NewSingleConnectionPool(False);
+  try
+    // Il chiamante cambia db direttamente sul client, scrive e rilascia
+    lFirst := lPool.AcquireConnection;
+    lFirst.Select(3);
+    lFirst.SetValue(TEST_KEY, 'on_db3');
+    lPool.ReleaseConnection(lFirst);
+
+    // Con una sola connessione nel pool la riacquisizione restituisce la stessa
+    lSecond := lPool.AcquireConnection;
+    Assert.IsTrue(lSecond = lFirst, 'Il pool dovrebbe restituire la stessa connessione');
+    Assert.AreEqual(0, lSecond.CurrentDb, 'AcquireConnection dovrebbe riportare la connessione sul db 0');
+    Assert.IsTrue(lSecond.Get(TEST_KEY).IsNull, 'La chiave scritta sul db 3 non dovrebbe essere visibile dal db 0');
+
+    // Pulizia sul db 3
+    lSecond.Select(3);
+    lSecond.Del([TEST_KEY]);
+    lPool.ReleaseConnection(lSecond);
+  finally
+    lPool.Shutdown;
+  end;
+end;
+
+procedure TRedisPoolTests.Test_Pool_Release_WithOpenMulti_DestroysConnection;
+const
+  TEST_KEY = 'test:pool:dirtymulti:key';
+var
+  lPool: IRedisConnectionPool;
+  lFirst, lSecond: IRedisClient;
+begin
+  lPool := NewSingleConnectionPool(False);
+  try
+    // Il chiamante apre una transazione e rilascia senza Exec né Discard
+    lFirst := lPool.AcquireConnection;
+    lFirst.Multi;
+    lPool.ReleaseConnection(lFirst);
+
+    Assert.AreEqual<Int64>(1, lPool.GetStats.TotalDestroyed, 'La connessione con MULTI aperto dovrebbe essere distrutta');
+
+    // La nuova connessione deve eseguire i comandi subito, non accodarli (QUEUED)
+    lSecond := lPool.AcquireConnection;
+    Assert.IsFalse(lSecond = lFirst, 'Il pool dovrebbe fornire una connessione nuova');
+    Assert.IsFalse(lSecond.IsInTransaction, 'La nuova connessione non dovrebbe essere in transazione');
+
+    lSecond.SetValue(TEST_KEY, 'ok');
+    Assert.AreEqual('ok', lSecond.Get(TEST_KEY).AsString, 'Get dovrebbe restituire il valore, non QUEUED');
+
+    lSecond.Del([TEST_KEY]);
+    lPool.ReleaseConnection(lSecond);
+  finally
+    lPool.Shutdown;
+  end;
+end;
+
+procedure TRedisPoolTests.Test_Pool_Release_WithOpenWatch_DestroysConnection;
+var
+  lPool: IRedisConnectionPool;
+  lFirst, lSecond: IRedisClient;
+begin
+  lPool := NewSingleConnectionPool(False);
+  try
+    // Il chiamante lascia un WATCH attivo
+    lFirst := lPool.AcquireConnection;
+    lFirst.Watch(['test:pool:dirtywatch:key']);
+    lPool.ReleaseConnection(lFirst);
+
+    Assert.AreEqual<Int64>(1, lPool.GetStats.TotalDestroyed, 'La connessione con WATCH attivo dovrebbe essere distrutta');
+
+    lSecond := lPool.AcquireConnection;
+    Assert.IsFalse(lSecond = lFirst, 'Il pool dovrebbe fornire una connessione nuova');
+    Assert.IsFalse(lSecond.IsWatching, 'La nuova connessione non dovrebbe avere WATCH attivi');
+
+    lPool.ReleaseConnection(lSecond);
+  finally
+    lPool.Shutdown;
+  end;
+end;
+
+procedure TRedisPoolTests.Test_Pool_ResetOnRelease_ResetsStateAndKeepsConnection;
+var
+  lPool: IRedisConnectionPool;
+  lFirst, lSecond: IRedisClient;
+begin
+  // RESET richiede Redis 6.2+
+  lPool := NewSingleConnectionPool(True);
+  try
+    lFirst := lPool.AcquireConnection;
+    lFirst.Select(3);
+    lPool.ReleaseConnection(lFirst);
+
+    // Il RESET passa da ExecuteAndParse: il client sa già di essere sul db 0
+    Assert.AreEqual(0, lFirst.CurrentDb, 'Dopo il RESET al rilascio CurrentDb dovrebbe essere 0');
+    Assert.AreEqual<Int64>(0, lPool.GetStats.TotalDestroyed, 'Con RESET riuscito la connessione non dovrebbe essere distrutta');
+
+    lSecond := lPool.AcquireConnection;
+    Assert.IsTrue(lSecond = lFirst, 'Il pool dovrebbe restituire la stessa connessione');
+    Assert.IsTrue(lSecond.Ping, 'La connessione dovrebbe funzionare dopo il RESET');
+
+    lPool.ReleaseConnection(lSecond);
+  finally
+    lPool.Shutdown;
+  end;
 end;
 
 {$ENDREGION}

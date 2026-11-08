@@ -29,6 +29,22 @@
     e, se necessario, invia SELECT prima di restituirla al chiamante.
     Questo evita che connessioni rilasciate dopo un SELECT rimangano
     sul db sbagliato per il consumer successivo.
+
+ - Updated:   08/11/2026 - Correzioni v2.1
+
+ - Cambiamenti principali:
+    Il database corrente non è più tracciato nel pool ma nel client
+    (IRedisClient.CurrentDb), così anche un Select fatto dal chiamante
+    viene visto da EnsureDatabase (#3).
+    ReleaseConnection distrugge la connessione se MULTI, WATCH o una
+    pipeline sono rimasti aperti (#3).
+    Nuova opzione TRedisPoolConfig.ResetOnRelease: RESET a ogni rilascio
+    (Redis 6.2+), con ripristino di AUTH e CLIENT SETNAME (#3).
+    TRedisConnectionPool.New passa il transport richiesto (#1).
+    CleanupIdleConnections: risolto use-after-free e conteggio del
+    minimo di connessioni (#2).
+    InternalAcquire: se EnsureDatabase fallisce la connessione viene
+    distrutta invece di restare InUse per sempre (#6).
 -----------------------------------------------------------------------------}
 
 unit Redis.Pool;
@@ -54,6 +70,7 @@ type
     IdleTimeout: Integer;         // Timeout prima di chiudere connessioni idle (ms)
     ValidationInterval: Integer;  // Intervallo validazione connessioni (ms)
     EnableHealthCheck: Boolean;   // Abilita controlli di salute
+    ResetOnRelease: Boolean;      // RESET a ogni rilascio (Redis 6.2+), +1 round trip.
 
     class operator Initialize(out Dest: TRedisPoolConfig);
     class operator Finalize(var Dest: TRedisPoolConfig);
@@ -88,6 +105,7 @@ type
   TPooledConnection = class(TObject)
   private
     FClient: IRedisClient;
+    FRedisConfig: TRedisConnectionConfig;
     FPool: TRedisConnectionPool;
     FCreatedAt: TDateTime;
     FLastUsedAt: TDateTime;
@@ -95,10 +113,9 @@ type
     FLock: TCriticalSection;
     FUseCount: Int64;
     FErrorCount: Integer;
-    FCurrentDb: Integer;   // DATABASE corrente su questa connessione
-
     function GetIsHealthy: Boolean;
     function GetIdleTimeMs: Int64;
+    function GetCurrentDb: Integer;
   public
     constructor Create(aPool: TRedisConnectionPool; const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger; aTransport: string = 'synapse');
         reintroduce;
@@ -112,6 +129,7 @@ type
     procedure ResetErrorCount;
     /// Assicura che la connessione sia sul database richiesto
     procedure EnsureDatabase(aDb: Integer);
+    function ResetState: Boolean;
 
     property Client: IRedisClient read FClient;
     property InUse: Boolean read FInUse;
@@ -121,7 +139,7 @@ type
     property ErrorCount: Integer read FErrorCount;
     property CreatedAt: TDateTime read FCreatedAt;
     property LastUsedAt: TDateTime read FLastUsedAt;
-    property CurrentDb: Integer read FCurrentDb write FCurrentDb;
+    property CurrentDb: Integer read GetCurrentDb;
   end;
 
   // ============================================================================
@@ -237,6 +255,7 @@ begin
   Dest.IdleTimeout := 300000;        // 5 minuti idle prima di chiudere
   Dest.ValidationInterval := 30000;  // Valida ogni 30 secondi
   Dest.EnableHealthCheck := True;
+  Dest.ResetOnRelease := False;
 end;
 
 class operator TRedisPoolConfig.Finalize(var Dest: TRedisPoolConfig);
@@ -252,6 +271,7 @@ begin
   Dest.IdleTimeout := Src.IdleTimeout;
   Dest.ValidationInterval := Src.ValidationInterval;
   Dest.EnableHealthCheck := Src.EnableHealthCheck;
+  Dest.ResetOnRelease := Src.ResetOnRelease;
 end;
 
 procedure TRedisPoolConfig.Validate;
@@ -305,9 +325,9 @@ begin
   FInUse := False;
   FUseCount := 0;
   FErrorCount := 0;
-  FCurrentDb := aConfig.Database; // il db iniziale dalla config
-  
+
   // Crea e connette il client Redis
+  FRedisConfig := aConfig;
   FClient := TRedisClient.New(aConfig, aLogger, aTransport);
   FClient.Connect;
 end;
@@ -359,12 +379,11 @@ procedure TPooledConnection.EnsureDatabase(aDb: Integer);
 begin
   if aDb < 0 then // -1 = non importa il db
     Exit;
-  if FCurrentDb = aDb then // già sul db corretto
+  if FClient.CurrentDb = aDb then // già sul db corretto
     Exit;
 
   try
     FClient.Select(aDb);
-    FCurrentDb := aDb;
   except
     on E: Exception do
       raise ERedisConnectionException.CreateFmt('Impossibile selezionare database %d nella connessione pooled: %s', [aDb, E.Message]);
@@ -440,12 +459,41 @@ begin
   end;
 end;
 
+function TPooledConnection.ResetState: Boolean;
+begin
+  try
+    // RESET (Redis 6.2+): annulla MULTI/WATCH, esce da Pub/Sub, torna al db 0.
+    // Passa da ExecuteAndParse: il client aggiorna da solo CurrentDb a 0.
+    if FClient.ExecuteCommand(['RESET']).AsString <> 'RESET' then
+      Exit(False);
+
+    // RESET annulla anche AUTH: va rifatta come in Connect del transport
+    if FRedisConfig.Username.Trim <> '' then
+      FClient.ExecuteCommand(['AUTH', FRedisConfig.Username.Trim, FRedisConfig.Password.Trim])
+    else if FRedisConfig.Password.Trim <> '' then
+      FClient.ExecuteCommand(['AUTH', FRedisConfig.Password.Trim]);
+
+    // ...e il nome del client
+    if FRedisConfig.ClientName.Trim <> '' then
+      FClient.ExecuteCommand(['CLIENT', 'SETNAME', FRedisConfig.ClientName.Trim]);
+
+    Result := True;
+  except
+    Result := False;   // errore, AUTH rifiutata o Redis < 6.2: la connessione va distrutta
+  end;
+end;
+
+function TPooledConnection.GetCurrentDb: Integer;
+begin
+  Result := FClient.CurrentDb;
+end;
+
 { TRedisConnectionPool }
 
 class function TRedisConnectionPool.New(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil;
     aTransport: string = 'synapse'): IRedisConnectionPool;
 begin
-  Result := TRedisConnectionPool.Create(aPoolConfig, aRedisConfig, aLogger);
+  Result := TRedisConnectionPool.Create(aPoolConfig, aRedisConfig, aLogger, aTransport);
 end;
 
 constructor TRedisConnectionPool.Create(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil;
@@ -636,23 +684,23 @@ begin
   for var I := FConnections.Count - 1 downto 0 do
   begin
     var Connection := FConnections[i];
+
     if Connection.InUse then
       Continue;
-    if FConnections.Count - RemovedCount <= FConfig.MinConnections then
-      Break;
-    if not Connection.IsHealthy then
-    begin
-      if Assigned(FLogger) then
-        FLogger.LogDebug('Rimozione connessione non Healty');
 
-      DestroyConnection(Connection);
-      Inc(FStats.TotalDestroyed);
-      Inc(RemovedCount);
-    end;
-    if Connection.IdleTimeMs > FConfig.IdleTimeout then
+    if FConnections.Count <= FConfig.MinConnections then
+      Break;
+
+    var IsIdle := Connection.IdleTimeMs > FConfig.IdleTimeout;
+    if IsIdle or (not Connection.IsHealthy) then
     begin
       if Assigned(FLogger) then
-        FLogger.LogDebug(Format('Rimozione connessione idle da %d ms', [Connection.IdleTimeMs]));
+      begin
+        if IsIdle then
+          FLogger.LogDebug(Format('Rimozione connessione idle da %d ms', [Connection.IdleTimeMs]))
+        else
+          FLogger.LogDebug('Rimozione connessione non Healthy');
+      end;
 
       DestroyConnection(Connection);
       Inc(FStats.TotalDestroyed);
@@ -743,9 +791,29 @@ begin
     if lConnection = nil then
       raise ERedisTimeoutException.CreateFmt('Timeout acquisizione connessione dopo %d ms. Pool saturo?', [FConfig.AcquireTimeout]);
 
-    // FIX: riposiziona la connessione sul database richiesto
+    {-------------------------------------------------------------------------------------
+      Author: Muzio
+      Comment:
+        FIX: riposiziona la connessione sul database richiesto.
+        Se lConnection.EnsureDatabase(aDb) solleva un eccezione la connessione viene distrutta
+        e l'eccezione rilanciata.
+    --------------------------------------------------------------------------------------}
     if aDb >= 0 then
-      lConnection.EnsureDatabase(aDb);
+    begin
+      try
+        lConnection.EnsureDatabase(aDb);
+      except
+        FLock.Enter;
+        try
+          DestroyConnection(lConnection);
+          Inc(FStats.TotalErrors);
+        finally
+          FLock.Leave;
+        end;
+
+        raise;
+      end;
+    end;
 
     Result := lConnection.Client;
 
@@ -779,15 +847,37 @@ begin
   try
     var lFound := False;
     for var lConn in FConnections do
+    begin
       if lConn.Client = aClient then
       begin
-        lConn.Release;
-        Inc(FStats.TotalReleased);
         lFound := True;
-        if Assigned(FLogger) then
-          FLogger.LogDebug('Connessione rilasciata al pool');
+        Inc(FStats.TotalReleased);
+
+        if aClient.IsInTransaction or aClient.IsWatching or aClient.IsPipelineActive then
+        begin
+          if Assigned(FLogger) then
+            FLogger.LogWarning('Connessione rilasciata con MULTI/WATCH/pipeline aperti: viene distrutta');
+          DestroyConnection(lConn);
+          Inc(FStats.TotalDestroyed);
+        end
+        else if FConfig.ResetOnRelease and (not lConn.ResetState) then
+        begin
+          if Assigned(FLogger) then
+            FLogger.LogWarning('Reset fallito al rilascio: Connessione distrutta');
+          DestroyConnection(lConn);
+          Inc(FStats.TotalDestroyed);
+          Inc(FStats.TotalErrors);
+        end
+        else
+        begin
+          lConn.Release;
+          if Assigned(FLogger) then
+            FLogger.LogWarning('Connessione rilasciata al pool');
+        end;
+
         Break;
       end;
+    end;
 
     if not lFound and Assigned(FLogger) then
       FLogger.LogWarning('Tentativo di rilasciare connessione non nel pool');
