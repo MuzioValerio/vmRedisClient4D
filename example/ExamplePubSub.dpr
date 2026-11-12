@@ -32,28 +32,28 @@ program ExamplePubSub;
 
 uses
   System.SysUtils,
-  Redis.Client.Intf in '..\sources\Redis.Client.Intf.pas',
-  Redis.Client in '..\sources\Redis.Client.pas',
-  Redis.Connection.Config in '..\sources\Redis.Connection.Config.pas',
-  Redis.HealthCheck in '..\sources\Redis.HealthCheck.pas',
-  Redis.Logger.Empty in '..\sources\Redis.Logger.Empty.pas',
-  Redis.Pool in '..\sources\Redis.Pool.pas',
-  Redis.Protocol in '..\sources\Redis.Protocol.pas',
-  Redis.PubSub in '..\sources\Redis.PubSub.pas',
-  Redis.Response in '..\sources\Redis.Response.pas',
-  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas',
-  Redis.Transport.Intf in '..\sources\Redis.Transport.Intf.pas',
-  Redis.Transport.Registry in '..\sources\Redis.Transport.Registry.pas',
-  Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas',
-  Redis.Types in '..\sources\Redis.Types.pas';
+  vmRedis.Client.Intf in '..\sources\vmRedis.Client.Intf.pas',
+  vmRedis.Client in '..\sources\vmRedis.Client.pas',
+  vmRedis.Connection.Config in '..\sources\vmRedis.Connection.Config.pas',
+  vmRedis.HealthCheck in '..\sources\vmRedis.HealthCheck.pas',
+  vmRedis.Logger.Empty in '..\sources\vmRedis.Logger.Empty.pas',
+  vmRedis.Pool in '..\sources\vmRedis.Pool.pas',
+  vmRedis.Protocol in '..\sources\vmRedis.Protocol.pas',
+  vmRedis.PubSub in '..\sources\vmRedis.PubSub.pas',
+  vmRedis.Response in '..\sources\vmRedis.Response.pas',
+  vmRedis.Transport.Grijjy in '..\sources\vmRedis.Transport.Grijjy.pas',
+  vmRedis.Transport.Intf in '..\sources\vmRedis.Transport.Intf.pas',
+  vmRedis.Transport.Registry in '..\sources\vmRedis.Transport.Registry.pas',
+  vmRedis.Transport.Synapse in '..\sources\vmRedis.Transport.Synapse.pas',
+  vmRedis.Types in '..\sources\vmRedis.Types.pas';
 
 // ----------------------------------------------------------------------------
 // Pattern 1: Uso diretto del lRedisClient principale per comandi normali + PUBLISH
 // ----------------------------------------------------------------------------
 procedure SimplePublishExample;
 var
-  lConfig: TRedisConnectionConfig;
-  lRedisClient: IRedisClient;
+  lConfig: TvmRedisConnectionConfig;
+  lRedisClient: IvmRedisClient;
 begin
   lConfig.Host := 'localhost';
   lConfig.Port := 6379;
@@ -61,9 +61,9 @@ begin
   lConfig.ReadTimeout := 30000;
 
   // Usa il Transport Grijjy per la connessione
-//  lRedisClient := TRedisClient.New(lConfig, nil, 'grijjy');
+//  lRedisClient := TvmRedisClient.New(lConfig, nil, 'grijjy');
   // Usa il Transport Synapse per la connessione
-  lRedisClient := TRedisClient.New(lConfig, nil, 'synapse');
+  lRedisClient := TvmRedisClient.New(lConfig, nil, 'synapse');
 
   lRedisClient.Connect;
   try
@@ -84,7 +84,7 @@ end;
 // ----------------------------------------------------------------------------
 procedure DedicatedClientsExample;
 var
-  lConfig: TRedisConnectionConfig;
+  lConfig: TvmRedisConnectionConfig;
 begin
   lConfig.Host := 'localhost';
   lConfig.Port := 6379;
@@ -92,7 +92,7 @@ begin
   lConfig.ReadTimeout := 30000;
 
   // Client principale per le operazioni normali
-  var lMainClient := TRedisClient.New(lConfig, nil, 'grijjy');
+  var lMainClient := TvmRedisClient.New(lConfig, nil, 'grijjy');
   lMainClient.Connect;
 
   // Publisher dedicato
@@ -106,13 +106,13 @@ begin
   try
     // Configura il Subscriber
     lSubscriber.Subscribe(['events', 'notifications'],
-      procedure(const Msg: TRedisPubSubMessage)
+      procedure(const Msg: TvmRedisPubSubMessage)
       begin
         Writeln(Format('[%s] %s', [Msg.Channel, Msg.Payload]));
       end);
 
     // Avvia l'ascolto in un thread separato
-    var lListenerThread := TRedisPubSubListenerThread.Create(lSubscriber);
+    var lListenerThread := TvmRedisPubSubListenerThread.Create(lSubscriber);
     lListenerThread.Start;
 
     try
@@ -141,16 +141,16 @@ end;
 // Pattern 3: Applicazione completa con gestione eventi
 // ----------------------------------------------------------------------------
 type
-  TRedisEventManager = class(TObject)
+  TvmRedisEventManager = class(TObject)
   private
-    FConfig: TRedisConnectionConfig;
-    FMainClient: IRedisClient;
-    FPublisher: IRedisPubSubPublisher;
-    FSubscriber: IRedisPubSubClient;
-    FListenerThread: TRedisPubSubListenerThread;
-    FLogger: IRedisLogger;
+    FConfig: TvmRedisConnectionConfig;
+    FMainClient: IvmRedisClient;
+    FPublisher: IvmRedisPubSubPublisher;
+    FSubscriber: IvmRedisPubSubClient;
+    FListenerThread: TvmRedisPubSubListenerThread;
+    FLogger: IvmRedisLogger;
   public
-    constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; aTransport: string = 'synapse'); reintroduce;
+    constructor Create(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil; aTransport: string = 'synapse'); reintroduce;
     destructor Destroy; override;
 
     // Operazioni normali
@@ -159,17 +159,17 @@ type
 
     // Eventi
     procedure PublishEvent(const aEventType, aData: string);
-    procedure StartEventListening(aCallback: TRedisMessageCallback);
+    procedure StartEventListening(aCallback: TvmRedisMessageCallback);
     procedure StopEventListening;
   end;
 
-constructor TRedisEventManager.Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; aTransport: string = 'synapse');
+constructor TvmRedisEventManager.Create(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil; aTransport: string = 'synapse');
 begin
   inherited Create;
   FConfig := aConfig;
   FLogger := aLogger;
 
-  FMainClient := TRedisClient.New(FConfig, FLogger, aTransport);
+  FMainClient := TvmRedisClient.New(FConfig, FLogger, aTransport);
   FMainClient.Connect;
 
   FPublisher := FMainClient.CreatePublisher;
@@ -179,7 +179,7 @@ begin
   FSubscriber.Connect;
 end;
 
-destructor TRedisEventManager.Destroy;
+destructor TvmRedisEventManager.Destroy;
 begin
   StopEventListening;
 
@@ -195,14 +195,14 @@ begin
   inherited Destroy;
 end;
 
-procedure TRedisEventManager.SaveData(const aKey, aValue: string);
+procedure TvmRedisEventManager.SaveData(const aKey, aValue: string);
 begin
   FMainClient.SetValue(aKey, aValue);
 end;
 
-function TRedisEventManager.LoadData(const aKey: string): string;
+function TvmRedisEventManager.LoadData(const aKey: string): string;
 var
-  lResponse: IRedisResponse;
+  lResponse: IvmRedisResponse;
 begin
   lResponse := FMainClient.Get(aKey);
   if lResponse.IsNull then
@@ -211,19 +211,19 @@ begin
     Result := lResponse.AsString;
 end;
 
-procedure TRedisEventManager.PublishEvent(const aEventType, aData: string);
+procedure TvmRedisEventManager.PublishEvent(const aEventType, aData: string);
 begin
   FPublisher.Publish(aEventType, aData);
 end;
 
-procedure TRedisEventManager.StartEventListening(aCallback: TRedisMessageCallback);
+procedure TvmRedisEventManager.StartEventListening(aCallback: TvmRedisMessageCallback);
 begin
   FSubscriber.Subscribe(['user.login', 'user.logout', 'system.error'], aCallback);
-  FListenerThread := TRedisPubSubListenerThread.Create(FSubscriber);
+  FListenerThread := TvmRedisPubSubListenerThread.Create(FSubscriber);
   FListenerThread.Start;
 end;
 
-procedure TRedisEventManager.StopEventListening;
+procedure TvmRedisEventManager.StopEventListening;
 begin
   if Assigned(FSubscriber) and FSubscriber.IsListening then
   begin
@@ -240,17 +240,17 @@ end;
 
 procedure UseEventManager;
 var
-  lConfig: TRedisConnectionConfig;
+  lConfig: TvmRedisConnectionConfig;
 begin
   lConfig.Host := 'localhost';
   lConfig.Port := 6379;
   lConfig.ConnectionTimeout := 5000;
   lConfig.ReadTimeout := 30000;
 
-  var lManager := TRedisEventManager.Create(lConfig, nil, 'grijjy');
+  var lManager := TvmRedisEventManager.Create(lConfig, nil, 'grijjy');
   try
     lManager.StartEventListening(
-      procedure(const Msg: TRedisPubSubMessage)
+      procedure(const Msg: TvmRedisPubSubMessage)
       begin
         Writeln(Format('Event: %s - %s', [Msg.Channel, Msg.Payload]));
 

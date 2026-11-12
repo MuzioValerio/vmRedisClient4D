@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Protocol
+ Unit Name: vmRedis.Protocol
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    VMuzio
  Date:      14-dic-2025
@@ -22,42 +22,44 @@
  Purpose:
  History:
   - Updated:   2026 - Fix CRLF platform-dependent, Pipeline support,
-                      IRedisDataReader spostato in Redis.Transport.Intf
+                      IvmRedisDataReader spostato in vmRedis.Transport.Intf
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Protocol;
+unit vmRedis.Protocol;
 
 interface
 
 uses
   System.SysUtils, System.Classes, System.Generics.Collections,
-  Redis.Types,
-  Redis.Response,
-  Redis.Transport.Intf;
+  vmRedis.Types,
+  vmRedis.Response,
+  vmRedis.Transport.Intf;
 
 type
   // ---------------------------------------------------------------------------
   // Parser del protocollo RESP2
   // ---------------------------------------------------------------------------
-  TRedisProtocolParser = class(TObject)
+  TvmRedisProtocolParser = class(TObject)
   strict private
-    FReader: IRedisDataReader;
+    FReader: IvmRedisDataReader;
     function RemoveFirstChar(const aLine: string): string;
-    function ParseSimpleString(const aLine: string): IRedisResponse;
-    function ParseError(const aLine: string): IRedisResponse;
-    function ParseInteger(const aLine: string): IRedisResponse;
-    function ParseBulkString(const aLine: string): IRedisResponse;
-    function ParseArray(const aLine: string): IRedisResponse;
+    function ParseSimpleString(const aLine: string): IvmRedisResponse;
+    function ParseError(const aLine: string): IvmRedisResponse;
+    function ParseInteger(const aLine: string): IvmRedisResponse;
+    function ParseBulkString(const aLine: string): IvmRedisResponse;
+    function ParseArray(const aLine: string): IvmRedisResponse;
   public
-    constructor Create(aReader: IRedisDataReader);
-    function Parse: IRedisResponse;
-    function ParseMultiple(aCount: Integer): TArray<IRedisResponse>;
+    constructor Create(aReader: IvmRedisDataReader);
+    function Parse: IvmRedisResponse;
+    function ParseMultiple(aCount: Integer): TArray<IvmRedisResponse>;
   end;
 
   // ---------------------------------------------------------------------------
   // Serializzatore comandi Redis
   // ---------------------------------------------------------------------------
-  TRedisCommandSerializer = class(TObject)
+  TvmRedisCommandSerializer = class(TObject)
   public
     class function Serialize(const aParts: array of string): TBytes;
     class function SerializeRaw(const aParts: TArray<TBytes>): TBytes;
@@ -69,21 +71,21 @@ implementation
 uses
   System.Math;
 
-{ TRedisProtocolParser }
+{ TvmRedisProtocolParser }
 
-constructor TRedisProtocolParser.Create(aReader: IRedisDataReader);
+constructor TvmRedisProtocolParser.Create(aReader: IvmRedisDataReader);
 begin
   inherited Create;
   FReader := aReader;
 end;
 
-function TRedisProtocolParser.Parse: IRedisResponse;
+function TvmRedisProtocolParser.Parse: IvmRedisResponse;
 var
-  lDataType: TRedisDataType;
+  lDataType: TvmRedisDataType;
 begin
   var lLine := FReader.ReadLine;
   if Length(lLine) = 0 then
-    raise ERedisProtocolException.Create('Risposta vuota dal server');
+    raise EvmRedisProtocolException.Create('Risposta vuota dal server');
 
   var lFirstChar := lLine[1];
   lDataType := lDataType.FromChar(lFirstChar);
@@ -95,37 +97,37 @@ begin
     rdtBulkString: Result := ParseBulkString(lLine);
     rdtArray: Result := ParseArray(lLine);
     rdtNone:
-      raise ERedisProtocolException.CreateFmt('Tipo RESP non valido: %s', [lFirstChar]);
+      raise EvmRedisProtocolException.CreateFmt('Tipo RESP non valido: %s', [lFirstChar]);
   else
-    raise ERedisProtocolException.CreateFmt('Tipo RESP non gestito: %d', [Ord(lDataType)]);
+    raise EvmRedisProtocolException.CreateFmt('Tipo RESP non gestito: %d', [Ord(lDataType)]);
   end;
 end;
 
-function TRedisProtocolParser.ParseMultiple(aCount: Integer): TArray<IRedisResponse>;
+function TvmRedisProtocolParser.ParseMultiple(aCount: Integer): TArray<IvmRedisResponse>;
 begin
   SetLength(Result, aCount);
   for var I := 0 to aCount - 1 do
     Result[I] := Parse;
 end;
 
-function TRedisProtocolParser.ParseSimpleString(const aLine: string): IRedisResponse;
+function TvmRedisProtocolParser.ParseSimpleString(const aLine: string): IvmRedisResponse;
 begin
-  Result := TRedisResponseBuilder.CreateSimpleString(RemoveFirstChar(aLine));
+  Result := TvmRedisResponseBuilder.CreateSimpleString(RemoveFirstChar(aLine));
 end;
 
-function TRedisProtocolParser.ParseError(const aLine: string): IRedisResponse;
+function TvmRedisProtocolParser.ParseError(const aLine: string): IvmRedisResponse;
 begin
-  Result := TRedisResponseBuilder.CreateError(RemoveFirstChar(aLine));
+  Result := TvmRedisResponseBuilder.CreateError(RemoveFirstChar(aLine));
 end;
 
-function TRedisProtocolParser.ParseInteger(const aLine: string): IRedisResponse;
+function TvmRedisProtocolParser.ParseInteger(const aLine: string): IvmRedisResponse;
 begin
   var lValueStr := RemoveFirstChar(aLine);
   var lValue := StrToInt64Def(lValueStr, 0);
-  Result := TRedisResponseBuilder.CreateInteger(lValue);
+  Result := TvmRedisResponseBuilder.CreateInteger(lValue);
 end;
 
-function TRedisProtocolParser.ParseBulkString(const aLine: string): IRedisResponse;
+function TvmRedisProtocolParser.ParseBulkString(const aLine: string): IvmRedisResponse;
 var
   lSize: Integer;
   lData: TBytes;
@@ -135,14 +137,14 @@ begin
 
   if lSize = -1 then
   begin
-    Result := TRedisResponseBuilder.CreateNullBulkString;
+    Result := TvmRedisResponseBuilder.CreateNullBulkString;
     Exit;
   end;
 
   if lSize = 0 then
   begin
     FReader.ReadLine;
-    Result := TRedisResponseBuilder.CreateBulkString('');
+    Result := TvmRedisResponseBuilder.CreateBulkString('');
     Exit;
   end;
 
@@ -150,35 +152,35 @@ begin
   var lStrValue := TEncoding.UTF8.GetString(lData);
   FReader.ReadLine;
 
-  Result := TRedisResponseBuilder.CreateBulkString(lStrValue);
+  Result := TvmRedisResponseBuilder.CreateBulkString(lStrValue);
 end;
 
-function TRedisProtocolParser.ParseArray(const aLine: string): IRedisResponse;
+function TvmRedisProtocolParser.ParseArray(const aLine: string): IvmRedisResponse;
 begin
   var lCountStr := RemoveFirstChar(aLine);
   var lCount    := StrToIntDef(lCountStr, -1);
 
   if lCount = -1 then
   begin
-    Result := TRedisResponseBuilder.CreateNullArray;
+    Result := TvmRedisResponseBuilder.CreateNullArray;
     Exit;
   end;
 
-  var lArrayResp := TRedisResponse.New(rdtArray);
+  var lArrayResp := TvmRedisResponse.New(rdtArray);
   Result := lArrayResp;
 
   for var I := 0 to lCount - 1 do
     lArrayResp.AddArrayItem(Parse);
 end;
 
-function TRedisProtocolParser.RemoveFirstChar(const aLine: string): string;
+function TvmRedisProtocolParser.RemoveFirstChar(const aLine: string): string;
 begin
   Result := aLine.Substring(1);
 end;
 
-{ TRedisCommandSerializer }
+{ TvmRedisCommandSerializer }
 
-class function TRedisCommandSerializer.Serialize(const aParts: array of string): TBytes;
+class function TvmRedisCommandSerializer.Serialize(const aParts: array of string): TBytes;
 var
   lByteParts: TArray<TBytes>;
 begin
@@ -188,7 +190,7 @@ begin
   Result := SerializeRaw(lByteParts);
 end;
 
-class function TRedisCommandSerializer.SerializeWithList(aParts: TList<string>): TBytes;
+class function TvmRedisCommandSerializer.SerializeWithList(aParts: TList<string>): TBytes;
 var
   lByteParts: TArray<TBytes>;
 begin
@@ -198,7 +200,7 @@ begin
   Result := SerializeRaw(lByteParts);
 end;
 
-class function TRedisCommandSerializer.SerializeRaw(const aParts: TArray<TBytes>): TBytes;
+class function TvmRedisCommandSerializer.SerializeRaw(const aParts: TArray<TBytes>): TBytes;
 var
   lCount: string;
   lSize: string;

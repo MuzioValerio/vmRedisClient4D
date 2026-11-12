@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.HealthCheck
+ Unit Name: vmRedis.HealthCheck
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio
  Date:      14-dic-2025
@@ -20,21 +20,23 @@
  Info:
  Purpose:
  History:
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.HealthCheck;
+unit vmRedis.HealthCheck;
 
 interface
 
 uses
   System.SysUtils, System.Classes, System.DateUtils,
-  Redis.Types;
+  vmRedis.Types;
 
 type
   // Logger semplice su console + file di testo.
   // Da usare in sviluppo/test. In produzione sostituire con
   // un logger più robusto
-  TSimpleRedisLogger = class(TInterfacedObject, IRedisLogger)
+  TvmSimpleRedisLogger = class(TInterfacedObject, IvmRedisLogger)
   strict private
     FLogFile: string;
     procedure WriteLog(const aLevel, aMessage: string);
@@ -47,19 +49,19 @@ type
     procedure LogDebug(const aInfo: string);
     constructor Create(const aLogFile: string = ''); reintroduce;
   public
-    class function New(const aLogFile: string = ''): IRedisLogger;
+    class function New(const aLogFile: string = ''): IvmRedisLogger;
   end;
 
 implementation
 
-{ TSimpleRedisLogger }
+{ TvmSimpleRedisLogger }
 
-class function TSimpleRedisLogger.New(const aLogFile: string): IRedisLogger;
+class function TvmSimpleRedisLogger.New(const aLogFile: string): IvmRedisLogger;
 begin
-  Result := TSimpleRedisLogger.Create(aLogFile);
+  Result := TvmSimpleRedisLogger.Create(aLogFile);
 end;
 
-constructor TSimpleRedisLogger.Create(const aLogFile: string);
+constructor TvmSimpleRedisLogger.Create(const aLogFile: string);
 begin
   inherited Create;
   FLogFile := aLogFile;
@@ -67,7 +69,7 @@ begin
     FLogFile := 'redis_log.txt';
 end;
 
-procedure TSimpleRedisLogger.WriteLog(const aLevel, aMessage: string);
+procedure TvmSimpleRedisLogger.WriteLog(const aLevel, aMessage: string);
 var
   lLogLine: string;
   lF: TextFile;
@@ -94,32 +96,32 @@ begin
   end;
 end;
 
-procedure TSimpleRedisLogger.LogCommand(const aCommand: string);
+procedure TvmSimpleRedisLogger.LogCommand(const aCommand: string);
 begin
   WriteLog('CMD', aCommand);
 end;
 
-procedure TSimpleRedisLogger.LogResponse(const aResponse: string);
+procedure TvmSimpleRedisLogger.LogResponse(const aResponse: string);
 begin
   WriteLog('RESPONSE', aResponse);
 end;
 
-procedure TSimpleRedisLogger.LogError(const aError: string);
+procedure TvmSimpleRedisLogger.LogError(const aError: string);
 begin
   WriteLog('ERROR', aError);
 end;
 
-procedure TSimpleRedisLogger.LogWarning(const aWarning: string);
+procedure TvmSimpleRedisLogger.LogWarning(const aWarning: string);
 begin
   WriteLog('WARNING', aWarning);
 end;
 
-procedure TSimpleRedisLogger.LogInfo(const aInfo: string);
+procedure TvmSimpleRedisLogger.LogInfo(const aInfo: string);
 begin
   WriteLog('INFO', aInfo);
 end;
 
-procedure TSimpleRedisLogger.LogDebug(const aInfo: string);
+procedure TvmSimpleRedisLogger.LogDebug(const aInfo: string);
 begin
   WriteLog('DEBUG', aInfo);
 end;

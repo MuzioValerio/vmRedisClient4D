@@ -1,6 +1,6 @@
 {-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Client.Intf
+ Unit Name: vmRedis.Client.Intf
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio
  Date:      14-dic-2025
@@ -20,24 +20,26 @@
  Info:
  Purpose:
  History:
-  - Updated:   2026 - Rimossa dipendenza da Redis.Transport.Synapse.
+  - Updated:   2026 - Rimossa dipendenza da vmRedis.Transport.Synapse.
   - Updated:   08/11/2026 - Aggiunti IsInTransaction, IsWatching, IsPipelineActive
                       e CurrentDb, letti dal pool al rilascio della connessione (#3).
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Client.Intf;
+unit vmRedis.Client.Intf;
 
 interface
 
 uses
   System.Classes, System.SysUtils, System.Generics.Collections,
-  Redis.Types,
-  Redis.Response,
-  Redis.PubSub,
-  Redis.Connection.Config;
+  vmRedis.Types,
+  vmRedis.Response,
+  vmRedis.PubSub,
+  vmRedis.Connection.Config;
 
 type
-  IRedisClient = interface
+  IvmRedisClient = interface
   ['{9B8C7D6E-5F4A-3B2C-1D0E-9F8A7B6C5D4E}']
 
     // =========================================================================
@@ -56,21 +58,21 @@ type
     function CurrentDb: Integer;
 
     function Ping: Boolean;
-    function HealthCheckDetailed: TRedisHealthInfo;
+    function HealthCheckDetailed: TvmRedisHealthInfo;
     procedure LogHealthStatus;
 
     // =========================================================================
     // Chiavi - operazioni generiche
     // =========================================================================
-    function Get(const aKey: string): IRedisResponse;
+    function Get(const aKey: string): IvmRedisResponse;
     function SetValue(const aKey, aValue: string): Boolean;
     function SetEx(const aKey, aValue: string; aSeconds: Integer): Boolean;
     function PSetEx(const aKey, aValue: string; aMilliseconds: Int64): Boolean;
     function SetNX(const aKey, aValue: string): Boolean;
-    function GetEx(const aKey: string; aSeconds: Integer): IRedisResponse;
-    function GetExPersist(const aKey: string): IRedisResponse;
-    function GetDel(const aKey: string): IRedisResponse;
-    function GetSet(const aKey, aValue: string): IRedisResponse;
+    function GetEx(const aKey: string; aSeconds: Integer): IvmRedisResponse;
+    function GetExPersist(const aKey: string): IvmRedisResponse;
+    function GetDel(const aKey: string): IvmRedisResponse;
+    function GetSet(const aKey, aValue: string): IvmRedisResponse;
 
     function MGet(const aKeys: array of string): TArray<string>;
     function MSet(const aPairs: array of string): Boolean;
@@ -97,7 +99,7 @@ type
     function Copy(const aSrcKey, aDstKey: string; aReplace: Boolean = False): Boolean;
 
     function Keys(const aPattern: string): TArray<string>;
-    function Scan(aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TRedisScanResult;
+    function Scan(aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TvmRedisScanResult;
 
     // =========================================================================
     // Stringhe
@@ -119,16 +121,16 @@ type
     function RPush(const aKey: string; const aValues: array of string): Integer;
     function LPushX(const aKey: string; const aValues: array of string): Integer;
     function RPushX(const aKey: string; const aValues: array of string): Integer;
-    function LPop(const aKey: string): IRedisResponse;
-    function RPop(const aKey: string): IRedisResponse;
+    function LPop(const aKey: string): IvmRedisResponse;
+    function RPop(const aKey: string): IvmRedisResponse;
     function LLen(const aKey: string): Integer;
     function LRange(const aKey: string; aStart, aStop: Integer): TArray<string>;
-    function LIndex(const aKey: string; aIndex: Integer): IRedisResponse;
+    function LIndex(const aKey: string; aIndex: Integer): IvmRedisResponse;
     function LSet(const aKey: string; aIndex: Integer; const aValue: string): Boolean;
     function LInsert(const aKey: string; aBefore: Boolean; const aPivot, aValue: string): Integer;
     function LRem(const aKey: string; aCount: Integer; const aValue: string): Integer;
     function LTrim(const aKey: string; aStart, aStop: Integer): Boolean;
-    function LMove(const aSrc, aDst: string; aSrcLeft, aDstLeft: Boolean): IRedisResponse;
+    function LMove(const aSrc, aDst: string; aSrcLeft, aDstLeft: Boolean): IvmRedisResponse;
 
     // =========================================================================
     // Set
@@ -148,13 +150,13 @@ type
     function SInterStore(const aDst: string; const aKeys: array of string): Integer;
     function SDiff(const aKeys: array of string): TArray<string>;
     function SDiffStore(const aDst: string; const aKeys: array of string): Integer;
-    function SScan(const aKey: string; aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TRedisScanResult;
+    function SScan(const aKey: string; aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TvmRedisScanResult;
 
     // =========================================================================
     // Hash
     // =========================================================================
     function HSet(const aKey, aField, aValue: string): Boolean;
-    function HGet(const aKey, aField: string): IRedisResponse;
+    function HGet(const aKey, aField: string): IvmRedisResponse;
     function HGetAll(const aKey: string): TArray<string>;
     function HMGet(const aKey: string; const aFields: array of string): TArray<string>;
     function HMSet(const aKey: string; const aPairs: array of string): Boolean;
@@ -166,13 +168,13 @@ type
     function HIncrBy(const aKey, aField: string; aIncrement: Int64): Int64;
     function HIncrByFloat(const aKey, aField: string; aIncrement: Double): Double;
     function HRandField(const aKey: string; aCount: Integer = 1): TArray<string>;
-    function HScan(const aKey: string; aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TRedisScanResult;
+    function HScan(const aKey: string; aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TvmRedisScanResult;
 
     // =========================================================================
     // Sorted Set
     // =========================================================================
     function ZAdd(const aKey: string; aScore: Double; const aMember: string): Boolean;
-    function ZAddOpt(const aKey: string; aScore: Double; const aMember: string; aOption: TRedisZAddOption; aCH: Boolean = False): Integer;
+    function ZAddOpt(const aKey: string; aScore: Double; const aMember: string; aOption: TvmRedisZAddOption; aCH: Boolean = False): Integer;
     function ZRem(const aKey: string; const aMembers: array of string): Integer;
     function ZScore(const aKey, aMember: string): Double;
     function ZIncrBy(const aKey: string; aIncrement: Double; const aMember: string): Double;
@@ -187,7 +189,7 @@ type
     function ZPopMin(const aKey: string; aCount: Integer = 1): TArray<string>;
     function ZPopMax(const aKey: string; aCount: Integer = 1): TArray<string>;
     function ZRandMember(const aKey: string; aCount: Integer = 1): TArray<string>;
-    function ZScan(const aKey: string; aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TRedisScanResult;
+    function ZScan(const aKey: string; aCursor: Int64; const aPattern: string = ''; aCount: Integer = 10): TvmRedisScanResult;
 
     // =========================================================================
     // HyperLogLog
@@ -202,7 +204,7 @@ type
     procedure Watch(const aKeys: array of string);
     procedure Unwatch;
     procedure Multi;
-    function  Exec: IRedisResponse;
+    function  Exec: IvmRedisResponse;
     procedure Discard;
 
     // =========================================================================
@@ -210,13 +212,13 @@ type
     // =========================================================================
     procedure BeginPipeline;
     procedure PipelineCommand(const aParts: array of string);
-    function  ExecPipeline: TArray<IRedisResponse>;
+    function  ExecPipeline: TArray<IvmRedisResponse>;
 
     // =========================================================================
     // Scripting Lua
     // =========================================================================
-    function Eval(const aScript: string; const aKeys: array of string; const aArgs: array of string): IRedisResponse;
-    function EvalSha(const aSha: string; const aKeys: array of string; const aArgs: array of string): IRedisResponse;
+    function Eval(const aScript: string; const aKeys: array of string; const aArgs: array of string): IvmRedisResponse;
+    function EvalSha(const aSha: string; const aKeys: array of string; const aArgs: array of string): IvmRedisResponse;
     function ScriptLoad(const aScript: string): string;
 
     // =========================================================================
@@ -234,14 +236,14 @@ type
     // =========================================================================
     // Pub/Sub
     // =========================================================================
-    function CreatePublisher: IRedisPubSubPublisher;
-    function CreateSubscriber: IRedisPubSubClient;
+    function CreatePublisher: IvmRedisPubSubPublisher;
+    function CreateSubscriber: IvmRedisPubSubClient;
     function Publish(const aChannel, aMessage: string): Integer;
 
     // =========================================================================
     // Comando generico
     // =========================================================================
-    function ExecuteCommand(const aParts: array of string): IRedisResponse;
+    function ExecuteCommand(const aParts: array of string): IvmRedisResponse;
   end;
 
 implementation

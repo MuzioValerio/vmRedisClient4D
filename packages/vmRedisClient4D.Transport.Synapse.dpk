@@ -66,6 +66,6 @@ contains
   blcksock in '..\synapse\blcksock.pas',
   ssl_openssl3_lib in '..\synapse\ssl_openssl3_lib.pas',
   ssl_openssl3 in '..\synapse\ssl_openssl3.pas',
-  Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas';
+  vmRedis.Transport.Synapse in '..\sources\vmRedis.Transport.Synapse.pas';
 
 end.

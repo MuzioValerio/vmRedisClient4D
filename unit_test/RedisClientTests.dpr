@@ -23,7 +23,7 @@
 
   PREREQUISITI:
    - Redis Server >= 7.0 in esecuzione su localhost:6379
-   - Nessuna password (o configurare TRedisConnectionConfig nei test)
+   - Nessuna password (o configurare TvmRedisConnectionConfig nei test)
    - DUnitX installato nel search path
    - Synapse installato nel search path
    - GrijjyFoundation installato nel search path
@@ -52,23 +52,23 @@ uses
   DUnitX.Loggers.Xml.NUnit,
   {$ENDIF }
   DUnitX.TestFramework,
-  Redis.Client.Tests in 'Redis.Client.Tests.pas',
-  Redis.Pool.Tests in 'Redis.Pool.Tests.pas',
-  Redis.PubSub.Tests in 'Redis.PubSub.Tests.pas',
-  Redis.Client.Intf in '..\sources\Redis.Client.Intf.pas',
-  Redis.Client in '..\sources\Redis.Client.pas',
-  Redis.Connection.Config in '..\sources\Redis.Connection.Config.pas',
-  Redis.HealthCheck in '..\sources\Redis.HealthCheck.pas',
-  Redis.Logger.Empty in '..\sources\Redis.Logger.Empty.pas',
-  Redis.Pool in '..\sources\Redis.Pool.pas',
-  Redis.Protocol in '..\sources\Redis.Protocol.pas',
-  Redis.PubSub in '..\sources\Redis.PubSub.pas',
-  Redis.Response in '..\sources\Redis.Response.pas',
-  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas',
-  Redis.Transport.Intf in '..\sources\Redis.Transport.Intf.pas',
-  Redis.Transport.Registry in '..\sources\Redis.Transport.Registry.pas',
-  Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas',
-  Redis.Types in '..\sources\Redis.Types.pas';
+  vmRedis.Client.Tests in 'vmRedis.Client.Tests.pas',
+  vmRedis.Pool.Tests in 'vmRedis.Pool.Tests.pas',
+  vmRedis.PubSub.Tests in 'vmRedis.PubSub.Tests.pas',
+  vmRedis.Client.Intf in '..\sources\vmRedis.Client.Intf.pas',
+  vmRedis.Client in '..\sources\vmRedis.Client.pas',
+  vmRedis.Connection.Config in '..\sources\vmRedis.Connection.Config.pas',
+  vmRedis.HealthCheck in '..\sources\vmRedis.HealthCheck.pas',
+  vmRedis.Logger.Empty in '..\sources\vmRedis.Logger.Empty.pas',
+  vmRedis.Pool in '..\sources\vmRedis.Pool.pas',
+  vmRedis.Protocol in '..\sources\vmRedis.Protocol.pas',
+  vmRedis.PubSub in '..\sources\vmRedis.PubSub.pas',
+  vmRedis.Response in '..\sources\vmRedis.Response.pas',
+  vmRedis.Transport.Grijjy in '..\sources\vmRedis.Transport.Grijjy.pas',
+  vmRedis.Transport.Intf in '..\sources\vmRedis.Transport.Intf.pas',
+  vmRedis.Transport.Registry in '..\sources\vmRedis.Transport.Registry.pas',
+  vmRedis.Transport.Synapse in '..\sources\vmRedis.Transport.Synapse.pas',
+  vmRedis.Types in '..\sources\vmRedis.Types.pas';
 
 {$R *.RES}
 
@@ -93,12 +93,12 @@ begin
   WriteLn('  - Nessuna password configurata');
   WriteLn('');
   WriteLn('SUITE INCLUSE:');
-  WriteLn('  [1] Redis.Client.Tests  - Comandi base, stringhe, liste, set,');
+  WriteLn('  [1] vmRedis.Client.Tests  - Comandi base, stringhe, liste, set,');
   WriteLn('                            hash, sorted set, HyperLogLog,');
   WriteLn('                            transazioni, pipeline, Lua, admin');
-  WriteLn('  [2] Redis.Pool.Tests    - Pool, concorrenza, SELECT database,');
-  WriteLn('                            statistiche, helper, TPooledRedisClient');
-  WriteLn('  [3] Redis.PubSub.Tests  - Publisher, subscriber, pattern,');
+  WriteLn('  [2] vmRedis.Pool.Tests    - Pool, concorrenza, SELECT database,');
+  WriteLn('                            statistiche, helper, TvmPooledRedisClient');
+  WriteLn('  [3] vmRedis.PubSub.Tests  - Publisher, subscriber, pattern,');
   WriteLn('                            listener thread, factory methods');
   WriteLn('');
 end;

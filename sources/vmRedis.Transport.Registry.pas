@@ -1,6 +1,6 @@
 {-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Transport.Registry
+ Unit Name: vmRedis.Transport.Registry
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio
  Date:      26-mar-2026
@@ -25,68 +25,70 @@
    Utilizzo:
      // Nella unit del transport:
      initialization
-       TRedisTransportRegistry.RegisterProvider('synapse',
-         function(const Config: TRedisConnectionConfig; const Logger: IRedisLogger): IRedisTransport
+       TvmRedisTransportRegistry.RegisterProvider('synapse',
+         function(const Config: TvmRedisConnectionConfig; const Logger: IvmRedisLogger): IvmRedisTransport
          begin
-           Result := TRedisNativeTransport.Create(Config, Logger);
+           Result := TvmRedisNativeTransport.Create(Config, Logger);
          end);
 
      // Per ottenere un transport:
-     var Transport := TRedisTransportRegistry.Acquire('synapse', Config, Logger);
+     var Transport := TvmRedisTransportRegistry.Acquire('synapse', Config, Logger);
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Transport.Registry;
+unit vmRedis.Transport.Registry;
 
 interface
 
 uses
   System.Classes, System.SysUtils, System.Generics.Collections,
-  Redis.Transport.Intf,
-  Redis.Connection.Config,
-  Redis.Types;
+  vmRedis.Transport.Intf,
+  vmRedis.Connection.Config,
+  vmRedis.Types;
 
 type
-  TRedisTransportRegistry = class(TObject)
+  TvmRedisTransportRegistry = class(TObject)
   private
-    class var FProviders: TDictionary<string, TTransportActivator>;
+    class var FProviders: TDictionary<string, TvmTransportActivator>;
     class constructor Create;
     class destructor Destroy;
   public
-    class procedure RegisterProvider(const aID: string; const aActivator: TTransportActivator);
-    class function Acquire(const aID: string; const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger = nil): IRedisTransport;
+    class procedure RegisterProvider(const aID: string; const aActivator: TvmTransportActivator);
+    class function Acquire(const aID: string; const aConfig: TvmRedisConnectionConfig; const aLogger: IvmRedisLogger = nil): IvmRedisTransport;
   end;
 
 implementation
 
 uses
-  Redis.Logger.Empty;
+  vmRedis.Logger.Empty;
 
-{ TRedisTransportRegistry }
+{ TvmRedisTransportRegistry }
 
-class constructor TRedisTransportRegistry.Create;
+class constructor TvmRedisTransportRegistry.Create;
 begin
-  FProviders := TDictionary<string, TTransportActivator>.Create;
+  FProviders := TDictionary<string, TvmTransportActivator>.Create;
 end;
 
-class destructor TRedisTransportRegistry.Destroy;
+class destructor TvmRedisTransportRegistry.Destroy;
 begin
   FreeAndNil(FProviders);
 end;
 
-class procedure TRedisTransportRegistry.RegisterProvider(const aID: string; const aActivator: TTransportActivator);
+class procedure TvmRedisTransportRegistry.RegisterProvider(const aID: string; const aActivator: TvmTransportActivator);
 begin
   FProviders.AddOrSetValue(aID.ToLower, aActivator);
 end;
 
-class function TRedisTransportRegistry.Acquire(const aID: string; const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger = nil): IRedisTransport;
+class function TvmRedisTransportRegistry.Acquire(const aID: string; const aConfig: TvmRedisConnectionConfig; const aLogger: IvmRedisLogger = nil): IvmRedisTransport;
 var
-  lActivator: TTransportActivator;
-  lEffectiveLogger: IRedisLogger;
+  lActivator: TvmTransportActivator;
+  lEffectiveLogger: IvmRedisLogger;
 begin
   if Assigned(aLogger) then
     lEffectiveLogger := aLogger
   else
-    lEffectiveLogger := TRedisEmptyLogger.New;
+    lEffectiveLogger := TvmRedisEmptyLogger.New;
 
   if not FProviders.TryGetValue(aID.ToLower, lActivator) then
     raise Exception.CreateFmt('Provider di trasporto "%s" non registrato.', [aID]);

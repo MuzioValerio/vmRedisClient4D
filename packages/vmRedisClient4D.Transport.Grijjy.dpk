@@ -66,6 +66,6 @@ contains
   Grijjy.OpenSSL.API in '..\GrijjyFoundation\Grijjy.OpenSSL.API.pas',
   Grijjy.OpenSSL in '..\GrijjyFoundation\Grijjy.OpenSSL.pas',
   Grijjy.SocketPool.Win in '..\GrijjyFoundation\Grijjy.SocketPool.Win.pas',
-  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas';
+  vmRedis.Transport.Grijjy in '..\sources\vmRedis.Transport.Grijjy.pas';
 
 end.

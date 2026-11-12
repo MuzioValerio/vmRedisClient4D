@@ -142,23 +142,23 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="Redis.Client.Tests.pas"/>
-        <DCCReference Include="Redis.Pool.Tests.pas"/>
-        <DCCReference Include="Redis.PubSub.Tests.pas"/>
-        <DCCReference Include="..\sources\Redis.Client.Intf.pas"/>
-        <DCCReference Include="..\sources\Redis.Client.pas"/>
-        <DCCReference Include="..\sources\Redis.Connection.Config.pas"/>
-        <DCCReference Include="..\sources\Redis.HealthCheck.pas"/>
-        <DCCReference Include="..\sources\Redis.Logger.Empty.pas"/>
-        <DCCReference Include="..\sources\Redis.Pool.pas"/>
-        <DCCReference Include="..\sources\Redis.Protocol.pas"/>
-        <DCCReference Include="..\sources\Redis.PubSub.pas"/>
-        <DCCReference Include="..\sources\Redis.Response.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Grijjy.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Intf.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Registry.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Synapse.pas"/>
-        <DCCReference Include="..\sources\Redis.Types.pas"/>
+        <DCCReference Include="vmRedis.Client.Tests.pas"/>
+        <DCCReference Include="vmRedis.Pool.Tests.pas"/>
+        <DCCReference Include="vmRedis.PubSub.Tests.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Client.Intf.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Client.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Connection.Config.pas"/>
+        <DCCReference Include="..\sources\vmRedis.HealthCheck.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Logger.Empty.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Pool.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Protocol.pas"/>
+        <DCCReference Include="..\sources\vmRedis.PubSub.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Response.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Transport.Grijjy.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Transport.Intf.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Transport.Registry.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Transport.Synapse.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Types.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

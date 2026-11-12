@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Types
+ Unit Name: vmRedis.Types
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    VMuzio
  Date:      14-dic-2025
@@ -23,9 +23,11 @@
  Purpose:
  History:
   - Updated: 2026 - Aggiornamento completo per Redis 8.x
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Types;
+unit vmRedis.Types;
 
 interface
 
@@ -36,19 +38,19 @@ type
   // ---------------------------------------------------------------------------
   // Eccezioni
   // ---------------------------------------------------------------------------
-  ERedisException = class(Exception);
-  ERedisConnectionException = class(ERedisException);
-  ERedisProtocolException = class(ERedisException);
-  ERedisCommandException = class(ERedisException);
-  ERedisValidationException = class(ERedisException);
-  ERedisConfigException = class(Exception);
-  ERedisPipelineException = class(ERedisException);
-  ERedisTimeoutException = class(ERedisConnectionException);
+  EvmRedisException = class(Exception);
+  EvmRedisConnectionException = class(EvmRedisException);
+  EvmRedisProtocolException = class(EvmRedisException);
+  EvmRedisCommandException = class(EvmRedisException);
+  EvmRedisValidationException = class(EvmRedisException);
+  EvmRedisConfigException = class(Exception);
+  EvmRedisPipelineException = class(EvmRedisException);
+  EvmRedisTimeoutException = class(EvmRedisConnectionException);
 
   // ---------------------------------------------------------------------------
   // Tipi di risposta Redis - protocollo RESP2
   // ---------------------------------------------------------------------------
-  TRedisDataType = (
+  TvmRedisDataType = (
     rdtNone,
     rdtSimpleString,    // +
     rdtError,           // -
@@ -57,14 +59,14 @@ type
     rdtArray            // *
   );
 
-  TRedisDataTypeHelper = record helper for TRedisDataType
-    class function FromChar(const aChar: Char): TRedisDataType; static;
+  TvmRedisDataTypeHelper = record helper for TvmRedisDataType
+    class function FromChar(const aChar: Char): TvmRedisDataType; static;
     function ToChar: Char;
     function ToString: string;
   end;
 
 const
-  REDIS_TYPE_CHARS: array[TRedisDataType] of Char = (
+  REDIS_TYPE_CHARS: array[TvmRedisDataType] of Char = (
     #0,    // rdtNone
     '+',   // rdtSimpleString
     '-',   // rdtError
@@ -73,7 +75,7 @@ const
     '*'    // rdtArray
   );
 
-  REDIS_TYPE_NAMES: array[TRedisDataType] of string = (
+  REDIS_TYPE_NAMES: array[TvmRedisDataType] of string = (
     'None', 'Simple String', 'Error', 'Integer', 'Bulk String', 'Array'
   );
 
@@ -81,20 +83,20 @@ type
   // ---------------------------------------------------------------------------
   // Opzioni per comandi SET
   // ---------------------------------------------------------------------------
-  TRedisSetOption = (rsoNone, rsoNX, rsoXX);
-  TRedisExpireOption = (reoNone, reoEX, reoPX, reoEXAT, reoPXAT, reoKEEPTTL);
+  TvmRedisSetOption = (rsoNone, rsoNX, rsoXX);
+  TvmRedisExpireOption = (reoNone, reoEX, reoPX, reoEXAT, reoPXAT, reoKEEPTTL);
 
   // Opzioni per ZADD
-  TRedisZAddOption = (rzaNone, rzaNX, rzaXX, rzaGT, rzaLT);
+  TvmRedisZAddOption = (rzaNone, rzaNX, rzaXX, rzaGT, rzaLT);
 
   // Opzioni per sorted sets - aggregazione
-  TRedisAggregate = (raSum, raMin, raMax);
-  TRedisRangeOption  = (rroNone, rroWithScores, rroLimit);
+  TvmRedisAggregate = (raSum, raMin, raMax);
+  TvmRedisRangeOption  = (rroNone, rroWithScores, rroLimit);
 
   // ---------------------------------------------------------------------------
   // Record risultato SCAN (cursore + elementi)
   // ---------------------------------------------------------------------------
-  TRedisScanResult = record
+  TvmRedisScanResult = record
     Cursor: Int64;
     Items:  TArray<string>;
   end;
@@ -102,13 +104,13 @@ type
   // ---------------------------------------------------------------------------
   // Forward declarations
   // ---------------------------------------------------------------------------
-  IRedisResponse = interface;
-  IRedisLogger = interface;
+  IvmRedisResponse = interface;
+  IvmRedisLogger = interface;
 
   // ---------------------------------------------------------------------------
   // Interfaccia logger opzionale
   // ---------------------------------------------------------------------------
-  IRedisLogger = interface(IInterface)
+  IvmRedisLogger = interface(IInterface)
   ['{A1B2C3D4-E5F6-7A8B-9C0D-1E2F3A4B5C6D}']
     procedure LogCommand(const aCommand: string);
     procedure LogResponse(const aResponse: string);
@@ -121,24 +123,24 @@ type
   // ---------------------------------------------------------------------------
   // Interfaccia risposta Redis
   // ---------------------------------------------------------------------------
-  IRedisResponse = interface(IInterface)
+  IvmRedisResponse = interface(IInterface)
   ['{7000AD37-5818-4E9D-9793-4B3ED2D4E51B}']
-    function GetDataType: TRedisDataType;
+    function GetDataType: TvmRedisDataType;
     function GetRawValue: string;
     function AsString: string;
     function AsInteger: Int64;
     function AsBoolean: Boolean;
-    function AsArray: TArray<IRedisResponse>;
+    function AsArray: TArray<IvmRedisResponse>;
     function IsNull: Boolean;
     function IsError: Boolean;
     function GetErrorMessage: string;
 
-    function SetStringValue(const aValue: string): IRedisResponse;
-    function SetIntValue(const aValue: Int64): IRedisResponse;
-    function SetNull: IRedisResponse;
-    procedure AddArrayItem(aItem: IRedisResponse);
+    function SetStringValue(const aValue: string): IvmRedisResponse;
+    function SetIntValue(const aValue: Int64): IvmRedisResponse;
+    function SetNull: IvmRedisResponse;
+    procedure AddArrayItem(aItem: IvmRedisResponse);
 
-    property DataType: TRedisDataType read GetDataType;
+    property DataType: TvmRedisDataType read GetDataType;
     property RawValue: string read GetRawValue;
   end;
 
@@ -173,7 +175,7 @@ const
 // Record HealthInfo
 // ---------------------------------------------------------------------------
 type
-  TRedisHealthInfo = record
+  TvmRedisHealthInfo = record
     IsHealthy: Boolean;
     PingSuccess: Boolean;
     PingResponseTimeMs: Int64;
@@ -189,7 +191,7 @@ type
 // Tipi Pub/Sub
 // ---------------------------------------------------------------------------
 type
-  TRedisMessageType = (
+  TvmRedisMessageType = (
     rmtMessage,
     rmtPMessage,
     rmtSubscribe,
@@ -198,21 +200,21 @@ type
     rmtPUnsubscribe
   );
 
-  TRedisMessageTypeHelper = record helper for TRedisMessageType
-    class function FromString(const aValue: string): TRedisMessageType; static;
+  TvmRedisMessageTypeHelper = record helper for TvmRedisMessageType
+    class function FromString(const aValue: string): TvmRedisMessageType; static;
     function ToString: string;
   end;
 
 const
-  REDIS_MESSAGE_TYPE: array[TRedisMessageType] of string = (
+  REDIS_MESSAGE_TYPE: array[TvmRedisMessageType] of string = (
     'message', 'pmessage', 'subscribe', 'psubscribe', 'unsubscribe', 'punsubscribe'
   );
 
 implementation
 
-{ TRedisHealthInfo }
+{ TvmRedisHealthInfo }
 
-function TRedisHealthInfo.ToString: string;
+function TvmRedisHealthInfo.ToString: string;
 begin
   var lBuilder := TStringBuilder.Create;
   try
@@ -234,12 +236,12 @@ begin
   end;
 end;
 
-{ TRedisDataTypeHelper }
+{ TvmRedisDataTypeHelper }
 
-class function TRedisDataTypeHelper.FromChar(const aChar: Char): TRedisDataType;
+class function TvmRedisDataTypeHelper.FromChar(const aChar: Char): TvmRedisDataType;
 begin
   Result := rdtNone;
-  for var lDataType := Low(TRedisDataType) to High(TRedisDataType) do
+  for var lDataType := Low(TvmRedisDataType) to High(TvmRedisDataType) do
     if REDIS_TYPE_CHARS[lDataType] = aChar then
     begin
       Result := lDataType;
@@ -247,22 +249,22 @@ begin
     end;
 end;
 
-function TRedisDataTypeHelper.ToChar: Char;
+function TvmRedisDataTypeHelper.ToChar: Char;
 begin
   Result := REDIS_TYPE_CHARS[Self];
 end;
 
-function TRedisDataTypeHelper.ToString: string;
+function TvmRedisDataTypeHelper.ToString: string;
 begin
   Result := REDIS_TYPE_NAMES[Self];
 end;
 
-{ TRedisMessageTypeHelper }
+{ TvmRedisMessageTypeHelper }
 
-class function TRedisMessageTypeHelper.FromString(const aValue: string): TRedisMessageType;
+class function TvmRedisMessageTypeHelper.FromString(const aValue: string): TvmRedisMessageType;
 begin
   Result := rmtMessage;
-  for var lType := Low(TRedisMessageType) to High(TRedisMessageType) do
+  for var lType := Low(TvmRedisMessageType) to High(TvmRedisMessageType) do
     if REDIS_MESSAGE_TYPE[lType] = aValue then
     begin
       Result := lType;
@@ -270,7 +272,7 @@ begin
     end;
 end;
 
-function TRedisMessageTypeHelper.ToString: string;
+function TvmRedisMessageTypeHelper.ToString: string;
 begin
   Result := REDIS_MESSAGE_TYPE[Self];
 end;

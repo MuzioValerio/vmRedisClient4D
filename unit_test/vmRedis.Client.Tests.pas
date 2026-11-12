@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Client.Tests
+ Unit Name: vmRedis.Client.Tests
  Copyright (C) 2025-2030 Muzio Valerio
  Author: Muzio Valerio
  Date: 14-gen-2025
@@ -33,7 +33,7 @@
          - DbSize, FlushDb, Info, Select, ClientSetName, ClientGetName
          - Pipeline: BeginPipeline, PipelineCommand, ExecPipeline
          - HyperLogLog: PFAdd, PFCount, PFMerge
-         - Scan restituisce TRedisScanResult (cursore + elementi)
+         - Scan restituisce TvmRedisScanResult (cursore + elementi)
 
  Purpose:
  History:
@@ -42,9 +42,11 @@
               stato della sessione: CurrentDb, IsInTransaction, IsWatching,
               IsPipelineActive (#3)
 
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Client.Tests;
+unit vmRedis.Client.Tests;
 
 interface
 
@@ -53,18 +55,18 @@ uses
   System.SysUtils,
   System.Classes,
   System.Generics.Collections,
-  Redis.Client,
-  Redis.Client.Intf,
-  Redis.Types,
-  Redis.Connection.Config,
-  Redis.Response;
+  vmRedis.Client,
+  vmRedis.Client.Intf,
+  vmRedis.Types,
+  vmRedis.Connection.Config,
+  vmRedis.Response;
 
 type
   [TestFixture]
-  TRedisClientTests = class
+  TvmRedisClientTests = class
   private
-    FClient: IRedisClient;
-    FConfig: TRedisConnectionConfig;
+    FClient: IvmRedisClient;
+    FConfig: TvmRedisConnectionConfig;
     procedure CleanupTestKeys;
   public
     [Setup]
@@ -418,27 +420,27 @@ implementation
 uses
   System.DateUtils;
 
-{ TRedisClientTests }
+{ TvmRedisClientTests }
 
-procedure TRedisClientTests.Setup;
+procedure TvmRedisClientTests.Setup;
 begin
   // NOTA: Assicurarsi che Redis sia in esecuzione su localhost:6379
-  FConfig := TRedisConnectionConfig.Localhost(0);
+  FConfig := TvmRedisConnectionConfig.Localhost(0);
   FConfig.ConnectionTimeout := 5000;
   FConfig.ReadTimeout := 5000;
 
   // Utilizzo di Grijjy come Transport
-  FClient := TRedisClient.New(FConfig, nil, 'grijjy');
+  FClient := TvmRedisClient.New(FConfig, nil, 'grijjy');
 
   // Utilizzo di Synapse come Transport
-//  FClient := TRedisClient.New(FConfig, nil, 'synapse');
+//  FClient := TvmRedisClient.New(FConfig, nil, 'synapse');
 
   FClient.Connect;
 
   CleanupTestKeys;
 end;
 
-procedure TRedisClientTests.TearDown;
+procedure TvmRedisClientTests.TearDown;
 begin
   if Assigned(FClient) then
   begin
@@ -448,9 +450,9 @@ begin
   end;
 end;
 
-procedure TRedisClientTests.CleanupTestKeys;
+procedure TvmRedisClientTests.CleanupTestKeys;
 var
-  lScan: TRedisScanResult;
+  lScan: TvmRedisScanResult;
   lCursor: Int64;
 begin
   try
@@ -469,44 +471,44 @@ end;
 
 {$REGION 'Test Connessione'}
 
-procedure TRedisClientTests.Test_Connection_Success;
+procedure TvmRedisClientTests.Test_Connection_Success;
 begin
   Assert.IsTrue(FClient.IsConnected, 'Client dovrebbe essere connesso');
 end;
 
-procedure TRedisClientTests.Test_Connection_InvalidHost;
+procedure TvmRedisClientTests.Test_Connection_InvalidHost;
 var
-  lInvalidConfig: TRedisConnectionConfig;
-  lInvalidClient: IRedisClient;
+  lInvalidConfig: TvmRedisConnectionConfig;
+  lInvalidClient: IvmRedisClient;
 begin
-  lInvalidConfig := TRedisConnectionConfig.Localhost;
+  lInvalidConfig := TvmRedisConnectionConfig.Localhost;
   lInvalidConfig.Host              := 'invalid.host.local';
   lInvalidConfig.Port              := 9999;
   lInvalidConfig.MaxRetries        := 1;
   lInvalidConfig.ConnectionTimeout := 1000;
 
   // Utilizzo di Grijjy come Transport
-  lInvalidClient := TRedisClient.New(lInvalidConfig, nil, 'grijjy');
+  lInvalidClient := TvmRedisClient.New(lInvalidConfig, nil, 'grijjy');
 
   // Utilizzo di Synapse come Transport
-//  lInvalidClient := TRedisClient.New(lInvalidConfig, nil, 'synapse');
+//  lInvalidClient := TvmRedisClient.New(lInvalidConfig, nil, 'synapse');
 
   Assert.WillRaise(
     procedure
     begin
       lInvalidClient.Connect;
     end,
-    ERedisConnectionException,
+    EvmRedisConnectionException,
     'Dovrebbe sollevare eccezione per host invalido'
   );
 end;
 
-procedure TRedisClientTests.Test_Ping_Connected;
+procedure TvmRedisClientTests.Test_Ping_Connected;
 begin
   Assert.IsTrue(FClient.Ping, 'PING dovrebbe restituire True');
 end;
 
-procedure TRedisClientTests.Test_Disconnect_And_Reconnect;
+procedure TvmRedisClientTests.Test_Disconnect_And_Reconnect;
 begin
   FClient.Disconnect;
   Assert.IsFalse(FClient.IsConnected, 'Client dovrebbe essere disconnesso');
@@ -515,9 +517,9 @@ begin
   Assert.IsTrue(FClient.IsConnected, 'Client dovrebbe essere riconnesso');
 end;
 
-procedure TRedisClientTests.Test_HealthCheck_Detailed;
+procedure TvmRedisClientTests.Test_HealthCheck_Detailed;
 var
-  lHealth: TRedisHealthInfo;
+  lHealth: TvmRedisHealthInfo;
 begin
   lHealth := FClient.HealthCheckDetailed;
 
@@ -532,12 +534,12 @@ end;
 
 {$REGION 'Test Chiavi Base'}
 
-procedure TRedisClientTests.Test_SetGet_SimpleValue;
+procedure TvmRedisClientTests.Test_SetGet_SimpleValue;
 const
   TEST_KEY   = 'test:setget:key';
   TEST_VALUE = 'Hello Redis!';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   Assert.IsTrue(FClient.SetValue(TEST_KEY, TEST_VALUE), 'SET dovrebbe avere successo');
 
@@ -548,7 +550,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SetEx_WithExpiration;
+procedure TvmRedisClientTests.Test_SetEx_WithExpiration;
 const
   TEST_KEY   = 'test:setex:key';
   TEST_VALUE = 'Expires soon';
@@ -565,7 +567,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_PSetEx_WithMilliseconds;
+procedure TvmRedisClientTests.Test_PSetEx_WithMilliseconds;
 const
   TEST_KEY   = 'test:psetex:key';
   TEST_VALUE = 'PExpires soon';
@@ -582,13 +584,13 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SetNX_OnlyIfNotExists;
+procedure TvmRedisClientTests.Test_SetNX_OnlyIfNotExists;
 const
   TEST_KEY = 'test:setnx:key';
   VALUE1   = 'First value';
   VALUE2   = 'Second value';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   // Prima scrittura deve riuscire
   Assert.IsTrue(FClient.SetNX(TEST_KEY, VALUE1), 'SetNX dovrebbe avere successo su chiave nuova');
@@ -602,13 +604,13 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_GetEx_WithExpiration;
+procedure TvmRedisClientTests.Test_GetEx_WithExpiration;
 const
   TEST_KEY   = 'test:getex:key';
   TEST_VALUE = 'GetEx value';
   SECONDS    = 10;
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
   lTTL: Integer;
 begin
   FClient.SetValue(TEST_KEY, TEST_VALUE);
@@ -625,12 +627,12 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_GetExPersist_RemovesExpiration;
+procedure TvmRedisClientTests.Test_GetExPersist_RemovesExpiration;
 const
   TEST_KEY   = 'test:getexpersist:key';
   TEST_VALUE = 'Persistent value';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
   lTTL: Integer;
 begin
   // Imposta chiave con scadenza
@@ -647,12 +649,12 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_GetDel_GetAndDelete;
+procedure TvmRedisClientTests.Test_GetDel_GetAndDelete;
 const
   TEST_KEY   = 'test:getdel:key';
   TEST_VALUE = 'To be deleted';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   FClient.SetValue(TEST_KEY, TEST_VALUE);
 
@@ -664,13 +666,13 @@ begin
   Assert.IsTrue(FClient.Get(TEST_KEY).IsNull, 'Chiave non dovrebbe esistere dopo GETDEL');
 end;
 
-procedure TRedisClientTests.Test_GetSet_SwapValue;
+procedure TvmRedisClientTests.Test_GetSet_SwapValue;
 const
   TEST_KEY   = 'test:getset:key';
   OLD_VALUE  = 'Old value';
   NEW_VALUE  = 'New value';
 var
-  lOldResult: IRedisResponse;
+  lOldResult: IvmRedisResponse;
 begin
   FClient.SetValue(TEST_KEY, OLD_VALUE);
 
@@ -682,7 +684,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_Del_SingleKey;
+procedure TvmRedisClientTests.Test_Del_SingleKey;
 const
   TEST_KEY = 'test:del:single';
 begin
@@ -691,7 +693,7 @@ begin
   Assert.IsTrue(FClient.Get(TEST_KEY).IsNull, 'Chiave non dovrebbe esistere');
 end;
 
-procedure TRedisClientTests.Test_Del_MultipleKeys;
+procedure TvmRedisClientTests.Test_Del_MultipleKeys;
 const
   KEY1 = 'test:del:k1';
   KEY2 = 'test:del:k2';
@@ -704,7 +706,7 @@ begin
   Assert.AreEqual(3, FClient.Del([KEY1, KEY2, KEY3]), 'DEL dovrebbe restituire 3');
 end;
 
-procedure TRedisClientTests.Test_Unlink_AsyncDelete;
+procedure TvmRedisClientTests.Test_Unlink_AsyncDelete;
 const
   TEST_KEY = 'test:unlink:key';
 begin
@@ -714,7 +716,7 @@ begin
   Assert.AreEqual(1, FClient.Unlink([TEST_KEY]), 'UNLINK dovrebbe restituire 1');
 end;
 
-procedure TRedisClientTests.Test_Exists_SingleKey;
+procedure TvmRedisClientTests.Test_Exists_SingleKey;
 const
   TEST_KEY = 'test:exists:key';
 begin
@@ -725,7 +727,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_Exists_MultipleKeys;
+procedure TvmRedisClientTests.Test_Exists_MultipleKeys;
 const
   KEY1 = 'test:exists:mk1';
   KEY2 = 'test:exists:mk2';
@@ -740,7 +742,7 @@ begin
   FClient.Del([KEY1, KEY2]);
 end;
 
-procedure TRedisClientTests.Test_MGet_MultipleKeys;
+procedure TvmRedisClientTests.Test_MGet_MultipleKeys;
 const
   KEY1 = 'test:mget:k1';
   KEY2 = 'test:mget:k2';
@@ -761,7 +763,7 @@ begin
   FClient.Del([KEY1, KEY2]);
 end;
 
-procedure TRedisClientTests.Test_MSet_MultipleKeyValues;
+procedure TvmRedisClientTests.Test_MSet_MultipleKeyValues;
 var
   lValues: TArray<string>;
 begin
@@ -778,7 +780,7 @@ begin
   FClient.Del(['test:mset:k1', 'test:mset:k2', 'test:mset:k3']);
 end;
 
-procedure TRedisClientTests.Test_MSetNX_OnlyIfNoneExist;
+procedure TvmRedisClientTests.Test_MSetNX_OnlyIfNoneExist;
 const
   KEY1 = 'test:msetnx:k1';
   KEY2 = 'test:msetnx:k2';
@@ -793,7 +795,7 @@ begin
   FClient.Del([KEY1, KEY2]);
 end;
 
-procedure TRedisClientTests.Test_Expire_SetTTL;
+procedure TvmRedisClientTests.Test_Expire_SetTTL;
 const
   TEST_KEY = 'test:expire:key';
 begin
@@ -804,7 +806,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_PExpire_SetMillisecondsTTL;
+procedure TvmRedisClientTests.Test_PExpire_SetMillisecondsTTL;
 const
   TEST_KEY      = 'test:pexpire:key';
   EXPIRE_MS     = 5000;
@@ -819,7 +821,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ExpireAt_SetUnixTimestamp;
+procedure TvmRedisClientTests.Test_ExpireAt_SetUnixTimestamp;
 const
   TEST_KEY = 'test:expireat:key';
 var
@@ -834,7 +836,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_PExpireAt_SetUnixTimestampMs;
+procedure TvmRedisClientTests.Test_PExpireAt_SetUnixTimestampMs;
 const
   TEST_KEY = 'test:pexpireat:key';
 var
@@ -849,7 +851,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_Persist_RemoveExpiration;
+procedure TvmRedisClientTests.Test_Persist_RemoveExpiration;
 const
   TEST_KEY = 'test:persist:key';
 begin
@@ -862,7 +864,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_TTL_GetTimeToLive;
+procedure TvmRedisClientTests.Test_TTL_GetTimeToLive;
 const
   TEST_KEY = 'test:ttl:key';
 begin
@@ -874,7 +876,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_PTTL_GetMillisecondsTTL;
+procedure TvmRedisClientTests.Test_PTTL_GetMillisecondsTTL;
 const
   TEST_KEY      = 'test:pttl:key';
   EXPIRE_MS     = 10000;
@@ -887,7 +889,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ExpireTime_GetUnixTimestamp;
+procedure TvmRedisClientTests.Test_ExpireTime_GetUnixTimestamp;
 const
   TEST_KEY = 'test:expiretime:key';
 var
@@ -904,7 +906,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_KeyType_CheckType;
+procedure TvmRedisClientTests.Test_KeyType_CheckType;
 const
   STR_KEY  = 'test:keytype:string';
   LIST_KEY = 'test:keytype:list';
@@ -928,7 +930,7 @@ begin
   FClient.Del([STR_KEY, LIST_KEY, SET_KEY, HASH_KEY, ZSET_KEY]);
 end;
 
-procedure TRedisClientTests.Test_Rename_RenameKey;
+procedure TvmRedisClientTests.Test_Rename_RenameKey;
 const
   OLD_KEY = 'test:rename:old';
   NEW_KEY = 'test:rename:new';
@@ -942,7 +944,7 @@ begin
   FClient.Del([NEW_KEY]);
 end;
 
-procedure TRedisClientTests.Test_RenameNX_OnlyIfDestNotExists;
+procedure TvmRedisClientTests.Test_RenameNX_OnlyIfDestNotExists;
 const
   SRC_KEY  = 'test:renamenx:src';
   DST_KEY  = 'test:renamenx:dst';
@@ -960,7 +962,7 @@ begin
   FClient.Del([DST_KEY, DST_KEY2]);
 end;
 
-procedure TRedisClientTests.Test_RandomKey_ReturnsKey;
+procedure TvmRedisClientTests.Test_RandomKey_ReturnsKey;
 var
   lKey: string;
 begin
@@ -973,7 +975,7 @@ begin
   FClient.Del(['test:randomkey:seed']);
 end;
 
-procedure TRedisClientTests.Test_Copy_CopyKey;
+procedure TvmRedisClientTests.Test_Copy_CopyKey;
 const
   SRC_KEY = 'test:copy:src';
   DST_KEY = 'test:copy:dst';
@@ -994,7 +996,7 @@ begin
   FClient.Del([SRC_KEY, DST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_Keys_MatchPattern;
+procedure TvmRedisClientTests.Test_Keys_MatchPattern;
 const
   PREFIX = 'test:keys:';
 var
@@ -1010,11 +1012,11 @@ begin
   FClient.Del([PREFIX + 'a', PREFIX + 'b', PREFIX + 'c']);
 end;
 
-procedure TRedisClientTests.Test_Scan_WithoutCount;
+procedure TvmRedisClientTests.Test_Scan_WithoutCount;
 const
   Prefix = 'test:scan:nocount';
 var
-  lScan: TRedisScanResult;
+  lScan: TvmRedisScanResult;
   lAll: TStringList;
   I: integer;
 begin
@@ -1043,11 +1045,11 @@ begin
      FClient.Del([Prefix + IntToStr(I)]);
 end;
 
-procedure TRedisClientTests.Test_Scan_WithoutPatternAndCount;
+procedure TvmRedisClientTests.Test_Scan_WithoutPatternAndCount;
 const
   Prefix = 'test:scan:nopattern';
 var
-  lScan: TRedisScanResult;
+  lScan: TvmRedisScanResult;
   lAll: TStringList;
   I: integer;
 begin
@@ -1076,11 +1078,11 @@ begin
      FClient.Del([Prefix + IntToStr(I)]);
 end;
 
-procedure TRedisClientTests.Test_Scan_WithPattern;
+procedure TvmRedisClientTests.Test_Scan_WithPattern;
 const
   PREFIX = 'test:scan:';
 var
-  lScan: TRedisScanResult;
+  lScan: TvmRedisScanResult;
   lAll: TStringList;
   I: Integer;
 begin
@@ -1110,7 +1112,7 @@ end;
 
 {$REGION 'Test Stringhe'}
 
-procedure TRedisClientTests.Test_Append_AppendToString;
+procedure TvmRedisClientTests.Test_Append_AppendToString;
 const
   TEST_KEY = 'test:append:key';
 var
@@ -1126,7 +1128,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_Incr_IncrementCounter;
+procedure TvmRedisClientTests.Test_Incr_IncrementCounter;
 const
   TEST_KEY = 'test:incr:counter';
 begin
@@ -1137,7 +1139,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_IncrBy_IncrementByAmount;
+procedure TvmRedisClientTests.Test_IncrBy_IncrementByAmount;
 const
   TEST_KEY = 'test:incrby:counter';
 begin
@@ -1148,7 +1150,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_IncrByFloat_FloatIncrement;
+procedure TvmRedisClientTests.Test_IncrByFloat_FloatIncrement;
 const
   TEST_KEY = 'test:incrbyfloat:counter';
   DELTA    = 1.5;
@@ -1165,7 +1167,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_Decr_DecrementCounter;
+procedure TvmRedisClientTests.Test_Decr_DecrementCounter;
 const
   TEST_KEY = 'test:decr:counter';
 begin
@@ -1176,7 +1178,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_DecrBy_DecrementByAmount;
+procedure TvmRedisClientTests.Test_DecrBy_DecrementByAmount;
 const
   TEST_KEY = 'test:decrby:counter';
 begin
@@ -1186,7 +1188,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_StrLen_GetStringLength;
+procedure TvmRedisClientTests.Test_StrLen_GetStringLength;
 const
   TEST_KEY   = 'test:strlen:key';
   TEST_VALUE = 'Hello World';
@@ -1198,7 +1200,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SetRange_OverwriteSubstring;
+procedure TvmRedisClientTests.Test_SetRange_OverwriteSubstring;
 const
   TEST_KEY = 'test:setrange:key';
 begin
@@ -1210,7 +1212,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_GetRange_ExtractSubstring;
+procedure TvmRedisClientTests.Test_GetRange_ExtractSubstring;
 const
   TEST_KEY = 'test:getrange:key';
 var
@@ -1230,7 +1232,7 @@ end;
 
 {$REGION 'Test Liste'}
 
-procedure TRedisClientTests.Test_LPush_AddToListLeft;
+procedure TvmRedisClientTests.Test_LPush_AddToListLeft;
 const
   TEST_KEY = 'test:lpush:list';
 begin
@@ -1242,7 +1244,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_RPush_AddToListRight;
+procedure TvmRedisClientTests.Test_RPush_AddToListRight;
 const
   TEST_KEY = 'test:rpush:list';
 var
@@ -1260,7 +1262,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LPushX_OnlyIfExists;
+procedure TvmRedisClientTests.Test_LPushX_OnlyIfExists;
 const
   EXISTING_KEY    = 'test:lpushx:existing';
   NONEXISTING_KEY = 'test:lpushx:nonexisting';
@@ -1274,7 +1276,7 @@ begin
   FClient.Del([EXISTING_KEY]);
 end;
 
-procedure TRedisClientTests.Test_RPushX_OnlyIfExists;
+procedure TvmRedisClientTests.Test_RPushX_OnlyIfExists;
 const
   EXISTING_KEY    = 'test:rpushx:existing';
   NONEXISTING_KEY = 'test:rpushx:nonexisting';
@@ -1287,11 +1289,11 @@ begin
   FClient.Del([EXISTING_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LPop_RemoveFromListLeft;
+procedure TvmRedisClientTests.Test_LPop_RemoveFromListLeft;
 const
   TEST_KEY = 'test:lpop:list';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   FClient.RPush(TEST_KEY, ['first', 'second', 'third']);
 
@@ -1303,11 +1305,11 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_RPop_RemoveFromListRight;
+procedure TvmRedisClientTests.Test_RPop_RemoveFromListRight;
 const
   TEST_KEY = 'test:rpop:list';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   FClient.RPush(TEST_KEY, ['first', 'second', 'third']);
 
@@ -1318,7 +1320,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LLen_GetListLength;
+procedure TvmRedisClientTests.Test_LLen_GetListLength;
 const
   TEST_KEY = 'test:llen:list';
 begin
@@ -1330,7 +1332,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LRange_GetListRange;
+procedure TvmRedisClientTests.Test_LRange_GetListRange;
 const
   TEST_KEY = 'test:lrange:list';
 var
@@ -1351,11 +1353,11 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LIndex_GetElementByIndex;
+procedure TvmRedisClientTests.Test_LIndex_GetElementByIndex;
 const
   TEST_KEY = 'test:lindex:list';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   FClient.RPush(TEST_KEY, ['first', 'second', 'third']);
 
@@ -1371,7 +1373,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LSet_SetElementByIndex;
+procedure TvmRedisClientTests.Test_LSet_SetElementByIndex;
 const
   TEST_KEY = 'test:lset:list';
 begin
@@ -1383,7 +1385,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LInsert_InsertBeforePivot;
+procedure TvmRedisClientTests.Test_LInsert_InsertBeforePivot;
 const
   TEST_KEY = 'test:linsert:before';
 var
@@ -1402,7 +1404,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LInsert_InsertAfterPivot;
+procedure TvmRedisClientTests.Test_LInsert_InsertAfterPivot;
 const
   TEST_KEY = 'test:linsert:after';
 var
@@ -1420,7 +1422,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LRem_RemoveElements;
+procedure TvmRedisClientTests.Test_LRem_RemoveElements;
 const
   TEST_KEY = 'test:lrem:list';
 var
@@ -1436,7 +1438,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LTrim_TrimList;
+procedure TvmRedisClientTests.Test_LTrim_TrimList;
 const
   TEST_KEY = 'test:ltrim:list';
 begin
@@ -1450,12 +1452,12 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_LMove_MoveElement;
+procedure TvmRedisClientTests.Test_LMove_MoveElement;
 const
   SRC_KEY = 'test:lmove:src';
   DST_KEY = 'test:lmove:dst';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   FClient.RPush(SRC_KEY, ['first', 'second', 'third']);
 
@@ -1473,7 +1475,7 @@ end;
 
 {$REGION 'Test Set'}
 
-procedure TRedisClientTests.Test_SAdd_AddToSet;
+procedure TvmRedisClientTests.Test_SAdd_AddToSet;
 const
   TEST_KEY = 'test:sadd:set';
 begin
@@ -1484,7 +1486,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SRem_RemoveFromSet;
+procedure TvmRedisClientTests.Test_SRem_RemoveFromSet;
 const
   TEST_KEY = 'test:srem:set';
 begin
@@ -1496,7 +1498,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SMembers_GetAllMembers;
+procedure TvmRedisClientTests.Test_SMembers_GetAllMembers;
 const
   TEST_KEY = 'test:smembers:set';
 var
@@ -1509,7 +1511,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SIsMember_CheckMembership;
+procedure TvmRedisClientTests.Test_SIsMember_CheckMembership;
 const
   TEST_KEY = 'test:sismember:set';
 begin
@@ -1521,7 +1523,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SMIsMember_CheckMultipleMemberships;
+procedure TvmRedisClientTests.Test_SMIsMember_CheckMultipleMemberships;
 const
   TEST_KEY = 'test:smismember:set';
 var
@@ -1539,7 +1541,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SCard_GetSetCardinality;
+procedure TvmRedisClientTests.Test_SCard_GetSetCardinality;
 const
   TEST_KEY = 'test:scard:set';
 begin
@@ -1550,7 +1552,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SPop_PopRandomMembers;
+procedure TvmRedisClientTests.Test_SPop_PopRandomMembers;
 const
   TEST_KEY = 'test:spop:set';
 var
@@ -1565,7 +1567,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SRandMember_GetRandomMembers;
+procedure TvmRedisClientTests.Test_SRandMember_GetRandomMembers;
 const
   TEST_KEY = 'test:srandmember:set';
 var
@@ -1581,7 +1583,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SMove_MoveMemberBetweenSets;
+procedure TvmRedisClientTests.Test_SMove_MoveMemberBetweenSets;
 const
   SRC_KEY = 'test:smove:src';
   DST_KEY = 'test:smove:dst';
@@ -1598,7 +1600,7 @@ begin
   FClient.Del([SRC_KEY, DST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SUnion_UnionOfSets;
+procedure TvmRedisClientTests.Test_SUnion_UnionOfSets;
 const
   KEY1 = 'test:sunion:k1';
   KEY2 = 'test:sunion:k2';
@@ -1614,7 +1616,7 @@ begin
   FClient.Del([KEY1, KEY2]);
 end;
 
-procedure TRedisClientTests.Test_SUnionStore_StoreUnion;
+procedure TvmRedisClientTests.Test_SUnionStore_StoreUnion;
 const
   KEY1     = 'test:sunionstore:k1';
   KEY2     = 'test:sunionstore:k2';
@@ -1630,7 +1632,7 @@ begin
   FClient.Del([KEY1, KEY2, DST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SInter_IntersectionOfSets;
+procedure TvmRedisClientTests.Test_SInter_IntersectionOfSets;
 const
   KEY1 = 'test:sinter:k1';
   KEY2 = 'test:sinter:k2';
@@ -1646,7 +1648,7 @@ begin
   FClient.Del([KEY1, KEY2]);
 end;
 
-procedure TRedisClientTests.Test_SInterStore_StoreIntersection;
+procedure TvmRedisClientTests.Test_SInterStore_StoreIntersection;
 const
   KEY1     = 'test:sinterstore:k1';
   KEY2     = 'test:sinterstore:k2';
@@ -1661,7 +1663,7 @@ begin
   FClient.Del([KEY1, KEY2, DST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SDiff_DifferenceOfSets;
+procedure TvmRedisClientTests.Test_SDiff_DifferenceOfSets;
 const
   KEY1 = 'test:sdiff:k1';
   KEY2 = 'test:sdiff:k2';
@@ -1677,7 +1679,7 @@ begin
   FClient.Del([KEY1, KEY2]);
 end;
 
-procedure TRedisClientTests.Test_SDiffStore_StoreDifference;
+procedure TvmRedisClientTests.Test_SDiffStore_StoreDifference;
 const
   KEY1    = 'test:sdiffstore:k1';
   KEY2    = 'test:sdiffstore:k2';
@@ -1692,11 +1694,11 @@ begin
   FClient.Del([KEY1, KEY2, DST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_SScan_ScanSetMembers;
+procedure TvmRedisClientTests.Test_SScan_ScanSetMembers;
 const
   TEST_KEY = 'test:sscan:set';
 var
-  lScan: TRedisScanResult;
+  lScan: TvmRedisScanResult;
   lAll: TStringList;
   I: Integer;
 begin
@@ -1725,7 +1727,7 @@ end;
 
 {$REGION 'Test Hash'}
 
-procedure TRedisClientTests.Test_HSet_SetHashField;
+procedure TvmRedisClientTests.Test_HSet_SetHashField;
 const
   TEST_KEY = 'test:hset:hash';
 begin
@@ -1735,7 +1737,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HGet_GetHashField;
+procedure TvmRedisClientTests.Test_HGet_GetHashField;
 const
   TEST_KEY = 'test:hget:hash';
 begin
@@ -1749,7 +1751,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HGetAll_GetAllFields;
+procedure TvmRedisClientTests.Test_HGetAll_GetAllFields;
 const
   TEST_KEY = 'test:hgetall:hash';
 var
@@ -1764,7 +1766,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HMGet_GetMultipleFields;
+procedure TvmRedisClientTests.Test_HMGet_GetMultipleFields;
 const
   TEST_KEY = 'test:hmget:hash';
 var
@@ -1782,7 +1784,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HMSet_SetMultipleFields;
+procedure TvmRedisClientTests.Test_HMSet_SetMultipleFields;
 const
   TEST_KEY = 'test:hmset:hash';
 begin
@@ -1797,7 +1799,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HDel_DeleteHashFields;
+procedure TvmRedisClientTests.Test_HDel_DeleteHashFields;
 const
   TEST_KEY = 'test:hdel:hash';
 var
@@ -1814,7 +1816,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HExists_CheckFieldExists;
+procedure TvmRedisClientTests.Test_HExists_CheckFieldExists;
 const
   TEST_KEY = 'test:hexists:hash';
 begin
@@ -1826,7 +1828,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HKeys_GetAllKeys;
+procedure TvmRedisClientTests.Test_HKeys_GetAllKeys;
 const
   TEST_KEY = 'test:hkeys:hash';
 var
@@ -1842,7 +1844,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HVals_GetAllValues;
+procedure TvmRedisClientTests.Test_HVals_GetAllValues;
 const
   TEST_KEY = 'test:hvals:hash';
 var
@@ -1857,7 +1859,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HLen_GetHashLength;
+procedure TvmRedisClientTests.Test_HLen_GetHashLength;
 const
   TEST_KEY = 'test:hlen:hash';
 begin
@@ -1870,7 +1872,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HIncrBy_IncrementIntField;
+procedure TvmRedisClientTests.Test_HIncrBy_IncrementIntField;
 const
   TEST_KEY = 'test:hincrby:hash';
 var
@@ -1887,7 +1889,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HIncrByFloat_IncrementFloatField;
+procedure TvmRedisClientTests.Test_HIncrByFloat_IncrementFloatField;
 const
   TEST_KEY = 'test:hincrbyfloat:hash';
 var
@@ -1901,7 +1903,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HRandField_GetRandomField;
+procedure TvmRedisClientTests.Test_HRandField_GetRandomField;
 const
   TEST_KEY = 'test:hrandfield:hash';
 var
@@ -1918,11 +1920,11 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_HScan_ScanHashFields;
+procedure TvmRedisClientTests.Test_HScan_ScanHashFields;
 const
   TEST_KEY = 'test:hscan:hash';
 var
-  lScan: TRedisScanResult;
+  lScan: TvmRedisScanResult;
   lAll: TStringList;
   I: Integer;
 begin
@@ -1952,7 +1954,7 @@ end;
 
 {$REGION 'Test Sorted Set'}
 
-procedure TRedisClientTests.Test_ZAdd_AddToSortedSet;
+procedure TvmRedisClientTests.Test_ZAdd_AddToSortedSet;
 const
   TEST_KEY = 'test:zadd:zset';
 begin
@@ -1963,7 +1965,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZAddOpt_WithNXOption;
+procedure TvmRedisClientTests.Test_ZAddOpt_WithNXOption;
 const
   TEST_KEY = 'test:zaddopt:nx';
 begin
@@ -1979,7 +1981,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZAddOpt_WithGTOption;
+procedure TvmRedisClientTests.Test_ZAddOpt_WithGTOption;
 const
   TEST_KEY = 'test:zaddopt:gt';
 begin
@@ -1995,7 +1997,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZRem_RemoveFromSortedSet;
+procedure TvmRedisClientTests.Test_ZRem_RemoveFromSortedSet;
 const
   TEST_KEY = 'test:zrem:zset';
 var
@@ -2012,7 +2014,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZScore_GetMemberScore;
+procedure TvmRedisClientTests.Test_ZScore_GetMemberScore;
 const
   TEST_KEY       = 'test:zscore:zset';
   EXPECTED_SCORE = 42.5;
@@ -2027,7 +2029,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZIncrBy_IncrementScore;
+procedure TvmRedisClientTests.Test_ZIncrBy_IncrementScore;
 const
   TEST_KEY = 'test:zincrby:zset';
 var
@@ -2042,7 +2044,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZCard_GetSortedSetCardinality;
+procedure TvmRedisClientTests.Test_ZCard_GetSortedSetCardinality;
 const
   TEST_KEY = 'test:zcard:zset';
 begin
@@ -2055,7 +2057,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZCount_CountByScore;
+procedure TvmRedisClientTests.Test_ZCount_CountByScore;
 const
   TEST_KEY = 'test:zcount:zset';
 begin
@@ -2071,7 +2073,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZRank_GetMemberRank;
+procedure TvmRedisClientTests.Test_ZRank_GetMemberRank;
 const
   TEST_KEY = 'test:zrank:zset';
 begin
@@ -2086,7 +2088,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZRevRank_GetMemberRevRank;
+procedure TvmRedisClientTests.Test_ZRevRank_GetMemberRevRank;
 const
   TEST_KEY = 'test:zrevrank:zset';
 begin
@@ -2100,7 +2102,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZRange_GetRangeByRank;
+procedure TvmRedisClientTests.Test_ZRange_GetRangeByRank;
 const
   TEST_KEY = 'test:zrange:zset';
 var
@@ -2124,7 +2126,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZRevRange_GetRangeByRankReverse;
+procedure TvmRedisClientTests.Test_ZRevRange_GetRangeByRankReverse;
 const
   TEST_KEY = 'test:zrevrange:zset';
 var
@@ -2141,7 +2143,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZRangeByScore_GetRangeByScore;
+procedure TvmRedisClientTests.Test_ZRangeByScore_GetRangeByScore;
 const
   TEST_KEY = 'test:zrangebyscore:zset';
 var
@@ -2161,7 +2163,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZRevRangeByScore_GetRangeByScoreReverse;
+procedure TvmRedisClientTests.Test_ZRevRangeByScore_GetRangeByScoreReverse;
 const
   TEST_KEY = 'test:zrevrangebyscore:zset';
 var
@@ -2178,7 +2180,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZPopMin_PopMinMembers;
+procedure TvmRedisClientTests.Test_ZPopMin_PopMinMembers;
 const
   TEST_KEY = 'test:zpopmin:zset';
 var
@@ -2197,7 +2199,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZPopMax_PopMaxMembers;
+procedure TvmRedisClientTests.Test_ZPopMax_PopMaxMembers;
 const
   TEST_KEY = 'test:zpopmax:zset';
 var
@@ -2213,7 +2215,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZRandMember_GetRandomMember;
+procedure TvmRedisClientTests.Test_ZRandMember_GetRandomMember;
 const
   TEST_KEY = 'test:zrandmember:zset';
 var
@@ -2230,11 +2232,11 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ZScan_ScanSortedSet;
+procedure TvmRedisClientTests.Test_ZScan_ScanSortedSet;
 const
   TEST_KEY = 'test:zscan:zset';
 var
-  lScan: TRedisScanResult;
+  lScan: TvmRedisScanResult;
   lAll: TStringList;
   I: Integer;
 begin
@@ -2264,7 +2266,7 @@ end;
 
 {$REGION 'Test HyperLogLog'}
 
-procedure TRedisClientTests.Test_PFAdd_AddElements;
+procedure TvmRedisClientTests.Test_PFAdd_AddElements;
 const
   TEST_KEY = 'test:pfadd:hll';
 begin
@@ -2273,7 +2275,7 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_PFCount_CountApproximate;
+procedure TvmRedisClientTests.Test_PFCount_CountApproximate;
 const
   KEY1 = 'test:pfcount:hll1';
   KEY2 = 'test:pfcount:hll2';
@@ -2293,7 +2295,7 @@ begin
   FClient.Del([KEY1, KEY2]);
 end;
 
-procedure TRedisClientTests.Test_PFMerge_MergeSets;
+procedure TvmRedisClientTests.Test_PFMerge_MergeSets;
 const
   KEY1    = 'test:pfmerge:src1';
   KEY2    = 'test:pfmerge:src2';
@@ -2314,13 +2316,13 @@ end;
 
 {$REGION 'Test Transazioni'}
 
-procedure TRedisClientTests.Test_Transaction_MultiExec_Success;
+procedure TvmRedisClientTests.Test_Transaction_MultiExec_Success;
 const
   KEY1    = 'test:tx:key1';
   KEY2    = 'test:tx:key2';
   CTR_KEY = 'test:tx:counter';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   FClient.Multi;
   try
@@ -2340,7 +2342,7 @@ begin
   end;
 end;
 
-procedure TRedisClientTests.Test_Transaction_Discard;
+procedure TvmRedisClientTests.Test_Transaction_Discard;
 const
   TEST_KEY = 'test:discard:key';
 begin
@@ -2351,11 +2353,11 @@ begin
   Assert.IsTrue(FClient.Get(TEST_KEY).IsNull, 'Chiave non dovrebbe esistere dopo DISCARD');
 end;
 
-procedure TRedisClientTests.Test_Transaction_Watch_Unwatch;
+procedure TvmRedisClientTests.Test_Transaction_Watch_Unwatch;
 const
   WATCHED_KEY = 'test:watch:key';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   FClient.SetValue(WATCHED_KEY, 'original');
 
@@ -2388,12 +2390,12 @@ end;
 
 {$REGION 'Test Pipeline'}
 
-procedure TRedisClientTests.Test_Pipeline_MultipleCommands;
+procedure TvmRedisClientTests.Test_Pipeline_MultipleCommands;
 const
   KEY1 = 'test:pipeline:k1';
   KEY2 = 'test:pipeline:k2';
 var
-  lResponses: TArray<IRedisResponse>;
+  lResponses: TArray<IvmRedisResponse>;
 begin
   FClient.BeginPipeline;
 
@@ -2413,12 +2415,12 @@ begin
   FClient.Del([KEY1, KEY2]);
 end;
 
-procedure TRedisClientTests.Test_Pipeline_MixedCommands;
+procedure TvmRedisClientTests.Test_Pipeline_MixedCommands;
 const
   HASH_KEY = 'test:pipeline:hash';
   LIST_KEY = 'test:pipeline:list';
 var
-  lResponses: TArray<IRedisResponse>;
+  lResponses: TArray<IvmRedisResponse>;
 begin
   FClient.BeginPipeline;
 
@@ -2440,11 +2442,11 @@ end;
 
 {$REGION 'Test Scripting Lua'}
 
-procedure TRedisClientTests.Test_Eval_SimpleScript;
+procedure TvmRedisClientTests.Test_Eval_SimpleScript;
 const
   TEST_KEY = 'test:eval:key';
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   FClient.SetValue(TEST_KEY, 'lua_value');
 
@@ -2455,13 +2457,13 @@ begin
   FClient.Del([TEST_KEY]);
 end;
 
-procedure TRedisClientTests.Test_ScriptLoad_And_EvalSha;
+procedure TvmRedisClientTests.Test_ScriptLoad_And_EvalSha;
 const
   TEST_KEY   = 'test:evalsha:key';
   LUA_SCRIPT = 'return redis.call("SET", KEYS[1], ARGV[1])';
 var
   lSha: string;
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   // Carica lo script
   lSha := FClient.ScriptLoad(LUA_SCRIPT);
@@ -2480,7 +2482,7 @@ end;
 
 {$REGION 'Test Server / Admin'}
 
-procedure TRedisClientTests.Test_DbSize_ReturnsPositive;
+procedure TvmRedisClientTests.Test_DbSize_ReturnsPositive;
 var
   lSize: Int64;
 begin
@@ -2492,7 +2494,7 @@ begin
   FClient.Del(['test:dbsize:seed']);
 end;
 
-procedure TRedisClientTests.Test_Info_ReturnsServerInfo;
+procedure TvmRedisClientTests.Test_Info_ReturnsServerInfo;
 var
   lInfo: string;
 begin
@@ -2501,7 +2503,7 @@ begin
   Assert.IsTrue(lInfo.Contains('redis_version'),       'INFO dovrebbe contenere redis_version');
 end;
 
-procedure TRedisClientTests.Test_ClientSetName_And_GetName;
+procedure TvmRedisClientTests.Test_ClientSetName_And_GetName;
 const
   CLIENT_NAME = 'test-client-name';
 var
@@ -2513,7 +2515,7 @@ begin
   Assert.AreEqual(CLIENT_NAME, lName, 'CLIENT GETNAME dovrebbe restituire il nome impostato');
 end;
 
-procedure TRedisClientTests.Test_Select_ChangeDatabase;
+procedure TvmRedisClientTests.Test_Select_ChangeDatabase;
 begin
   // SELECT 1
   Assert.IsTrue(FClient.Select(1), 'SELECT 1 dovrebbe avere successo');
@@ -2526,9 +2528,9 @@ end;
 
 {$REGION 'Test Comando Generico'}
 
-procedure TRedisClientTests.Test_ExecuteCommand_RawPing;
+procedure TvmRedisClientTests.Test_ExecuteCommand_RawPing;
 var
-  lResult: IRedisResponse;
+  lResult: IvmRedisResponse;
 begin
   lResult := FClient.ExecuteCommand(['PING']);
   Assert.IsFalse(lResult.IsNull,             'PING tramite ExecuteCommand non dovrebbe essere NULL');
@@ -2539,31 +2541,31 @@ end;
 
 {$REGION 'Test Validazioni'}
 
-procedure TRedisClientTests.Test_Validation_EmptyKey;
+procedure TvmRedisClientTests.Test_Validation_EmptyKey;
 begin
   Assert.WillRaise(
     procedure
     begin
       FClient.Get('');
     end,
-    ERedisValidationException,
+    EvmRedisValidationException,
     'Dovrebbe sollevare eccezione per chiave vuota'
   );
 end;
 
-procedure TRedisClientTests.Test_Validation_NegativeExpiration;
+procedure TvmRedisClientTests.Test_Validation_NegativeExpiration;
 begin
   Assert.WillRaise(
     procedure
     begin
       FClient.SetEx('test:key', 'value', -1);
     end,
-    ERedisValidationException,
+    EvmRedisValidationException,
     'Dovrebbe sollevare eccezione per scadenza negativa'
   );
 end;
 
-procedure TRedisClientTests.Test_Validation_EmptyArray;
+procedure TvmRedisClientTests.Test_Validation_EmptyArray;
 begin
   Assert.WillRaise(
     procedure
@@ -2572,7 +2574,7 @@ begin
       SetLength(lEmpty, 0);
       FClient.Del(lEmpty);
     end,
-    ERedisValidationException,
+    EvmRedisValidationException,
     'Dovrebbe sollevare eccezione per array vuoto'
   );
 end;
@@ -2581,16 +2583,16 @@ end;
 
 {$REGION 'Test Stato della Sessione'}
 
-procedure TRedisClientTests.Test_SessionState_CurrentDb_AfterConnect;
+procedure TvmRedisClientTests.Test_SessionState_CurrentDb_AfterConnect;
 begin
-  // Setup usa TRedisConnectionConfig.Localhost(0)
+  // Setup usa TvmRedisConnectionConfig.Localhost(0)
   Assert.AreEqual(0, FClient.CurrentDb,      'Dopo Connect CurrentDb dovrebbe essere il db della configurazione');
   Assert.IsFalse(FClient.IsInTransaction,    'Dopo Connect non dovrebbe esserci una transazione');
   Assert.IsFalse(FClient.IsWatching,         'Dopo Connect non dovrebbero esserci WATCH');
   Assert.IsFalse(FClient.IsPipelineActive,   'Dopo Connect non dovrebbe esserci una pipeline');
 end;
 
-procedure TRedisClientTests.Test_SessionState_CurrentDb_AfterSelect;
+procedure TvmRedisClientTests.Test_SessionState_CurrentDb_AfterSelect;
 begin
   try
     FClient.Select(3);
@@ -2602,7 +2604,7 @@ begin
   Assert.AreEqual(0, FClient.CurrentDb, 'Dopo Select(0) CurrentDb dovrebbe essere 0');
 end;
 
-procedure TRedisClientTests.Test_SessionState_CurrentDb_AfterExecuteCommandSelect;
+procedure TvmRedisClientTests.Test_SessionState_CurrentDb_AfterExecuteCommandSelect;
 begin
   // SELECT inviato come comando generico, anche in minuscolo
   try
@@ -2613,21 +2615,21 @@ begin
   end;
 end;
 
-procedure TRedisClientTests.Test_SessionState_CurrentDb_FailedSelectKeepsDb;
+procedure TvmRedisClientTests.Test_SessionState_CurrentDb_FailedSelectKeepsDb;
 begin
   Assert.WillRaise(
     procedure
     begin
       FClient.Select(9999);   // fuori dal range "databases" del server
     end,
-    ERedisCommandException,
-    'Select su un db inesistente dovrebbe sollevare ERedisCommandException'
+    EvmRedisCommandException,
+    'Select su un db inesistente dovrebbe sollevare EvmRedisCommandException'
   );
 
   Assert.AreEqual(0, FClient.CurrentDb, 'Una SELECT fallita non dovrebbe cambiare CurrentDb');
 end;
 
-procedure TRedisClientTests.Test_SessionState_CurrentDb_SelectInsideMultiIsUnknown;
+procedure TvmRedisClientTests.Test_SessionState_CurrentDb_SelectInsideMultiIsUnknown;
 begin
   try
     FClient.Multi;
@@ -2643,7 +2645,7 @@ begin
   Assert.AreEqual(0, FClient.CurrentDb, 'Dopo Select(0) CurrentDb dovrebbe essere di nuovo noto');
 end;
 
-procedure TRedisClientTests.Test_SessionState_CurrentDb_SelectInPipelineIsUnknown;
+procedure TvmRedisClientTests.Test_SessionState_CurrentDb_SelectInPipelineIsUnknown;
 begin
   try
     FClient.BeginPipeline;
@@ -2657,7 +2659,7 @@ begin
   end;
 end;
 
-procedure TRedisClientTests.Test_SessionState_InTransaction_MultiExec;
+procedure TvmRedisClientTests.Test_SessionState_InTransaction_MultiExec;
 begin
   Assert.IsFalse(FClient.IsInTransaction, 'Prima di Multi non dovrebbe esserci una transazione');
 
@@ -2669,7 +2671,7 @@ begin
   Assert.IsFalse(FClient.IsInTransaction, 'Dopo Exec IsInTransaction dovrebbe essere False');
 end;
 
-procedure TRedisClientTests.Test_SessionState_InTransaction_MultiDiscard;
+procedure TvmRedisClientTests.Test_SessionState_InTransaction_MultiDiscard;
 begin
   FClient.Multi;
   Assert.IsTrue(FClient.IsInTransaction, 'Dopo Multi IsInTransaction dovrebbe essere True');
@@ -2678,7 +2680,7 @@ begin
   Assert.IsFalse(FClient.IsInTransaction, 'Dopo Discard IsInTransaction dovrebbe essere False');
 end;
 
-procedure TRedisClientTests.Test_SessionState_Watching_WatchUnwatch;
+procedure TvmRedisClientTests.Test_SessionState_Watching_WatchUnwatch;
 begin
   Assert.IsFalse(FClient.IsWatching, 'Prima di Watch IsWatching dovrebbe essere False');
 
@@ -2689,7 +2691,7 @@ begin
   Assert.IsFalse(FClient.IsWatching, 'Dopo Unwatch IsWatching dovrebbe essere False');
 end;
 
-procedure TRedisClientTests.Test_SessionState_Watching_ClearedByExec;
+procedure TvmRedisClientTests.Test_SessionState_Watching_ClearedByExec;
 begin
   FClient.Watch(['test:session:watch']);
   FClient.Multi;
@@ -2700,7 +2702,7 @@ begin
   Assert.IsFalse(FClient.IsInTransaction, 'Dopo Exec IsInTransaction dovrebbe essere False');
 end;
 
-procedure TRedisClientTests.Test_SessionState_PipelineActive;
+procedure TvmRedisClientTests.Test_SessionState_PipelineActive;
 begin
   Assert.IsFalse(FClient.IsPipelineActive, 'Prima di BeginPipeline IsPipelineActive dovrebbe essere False');
 
@@ -2712,7 +2714,7 @@ begin
   Assert.IsFalse(FClient.IsPipelineActive, 'Dopo ExecPipeline IsPipelineActive dovrebbe essere False');
 end;
 
-procedure TRedisClientTests.Test_SessionState_Disconnect_ResetsState;
+procedure TvmRedisClientTests.Test_SessionState_Disconnect_ResetsState;
 begin
   FClient.Select(3);
   FClient.Watch(['test:session:watch']);

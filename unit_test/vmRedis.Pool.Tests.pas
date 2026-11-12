@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Pool.Tests
+ Unit Name: vmRedis.Pool.Tests
  Copyright (C) 2025-2030 Muzio Valerio
  Author: Muzio Valerio
  Date: 14-gen-2025
@@ -30,9 +30,11 @@
               - Test stato della connessione al rilascio: Select del chiamante,
                 MULTI/WATCH aperti, ResetOnRelease (#3)
 
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Pool.Tests;
+unit vmRedis.Pool.Tests;
 
 interface
 
@@ -42,23 +44,23 @@ uses
   System.Classes,
   System.SyncObjs,
   System.Threading,
-  Redis.Pool,
-  Redis.Client.Intf,
-  Redis.Client,
-  Redis.Connection.Config,
-  Redis.Types;
+  vmRedis.Pool,
+  vmRedis.Client.Intf,
+  vmRedis.Client,
+  vmRedis.Connection.Config,
+  vmRedis.Types;
 
 type
   [TestFixture]
-  TRedisPoolTests = class
+  TvmRedisPoolTests = class
   private
-    FPool: IRedisConnectionPool;
-    FPoolConfig: TRedisPoolConfig;
-    FRedisConfig: TRedisConnectionConfig;
+    FPool: IvmRedisConnectionPool;
+    FPoolConfig: TvmRedisPoolConfig;
+    FRedisConfig: TvmRedisConnectionConfig;
     FTransport: string;
 
     /// Pool con una sola connessione: la riacquisizione restituisce sempre la stessa
-    function NewSingleConnectionPool(aResetOnRelease: Boolean): IRedisConnectionPool;
+    function NewSingleConnectionPool(aResetOnRelease: Boolean): IvmRedisConnectionPool;
   public
     [Setup]
     procedure Setup;
@@ -158,7 +160,7 @@ type
     procedure Test_PoolHelper_ExceptionHandling;
 
     // -------------------------------------------------------------------------
-    // Test TPooledRedisClient (managed record)
+    // Test TvmPooledRedisClient (managed record)
     // -------------------------------------------------------------------------
     [Test]
     procedure Test_PooledClient_AutoRelease;
@@ -176,9 +178,9 @@ type
 
 implementation
 
-{ TRedisPoolTests }
+{ TvmRedisPoolTests }
 
-procedure TRedisPoolTests.Setup;
+procedure TvmRedisPoolTests.Setup;
 begin
   FPoolConfig.MinConnections := 2;
   FPoolConfig.MaxConnections := 5;
@@ -187,7 +189,7 @@ begin
   FPoolConfig.ValidationInterval := 10000;
   FPoolConfig.EnableHealthCheck := True;
 
-  FRedisConfig := TRedisConnectionConfig.Localhost(0);
+  FRedisConfig := TvmRedisConnectionConfig.Localhost(0);
   FRedisConfig.ConnectionTimeout := 3000;
   FRedisConfig.ReadTimeout := 3000;
 
@@ -197,21 +199,21 @@ begin
   // Utilizzo di Synapse come Transport
 //  FTransport := 'synapse';
 
-  FPool := TRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, FTransport);
+  FPool := TvmRedisConnectionPool.New(FPoolConfig, FRedisConfig, nil, FTransport);
 end;
 
-function TRedisPoolTests.NewSingleConnectionPool(aResetOnRelease: Boolean): IRedisConnectionPool;
+function TvmRedisPoolTests.NewSingleConnectionPool(aResetOnRelease: Boolean): IvmRedisConnectionPool;
 begin
   var lConfig := FPoolConfig;
   lConfig.MinConnections := 1;
   lConfig.MaxConnections := 1;
   lConfig.ResetOnRelease := aResetOnRelease;
 
-  Result := TRedisConnectionPool.New(lConfig, FRedisConfig, nil, FTransport);
+  Result := TvmRedisConnectionPool.New(lConfig, FRedisConfig, nil, FTransport);
   Result.Initialize;
 end;
 
-procedure TRedisPoolTests.TearDown;
+procedure TvmRedisPoolTests.TearDown;
 begin
   if Assigned(FPool) then
   begin
@@ -222,9 +224,9 @@ end;
 
 {$REGION 'Test Configurazione'}
 
-procedure TRedisPoolTests.Test_PoolConfig_DefaultValues;
+procedure TvmRedisPoolTests.Test_PoolConfig_DefaultValues;
 var
-  lConfig: TRedisPoolConfig;
+  lConfig: TvmRedisPoolConfig;
 begin
   Assert.AreEqual(2, lConfig.MinConnections, 'Default MinConnections dovrebbe essere 2');
   Assert.AreEqual(10, lConfig.MaxConnections, 'Default MaxConnections dovrebbe essere 10');
@@ -232,9 +234,9 @@ begin
   Assert.IsTrue(lConfig.EnableHealthCheck, 'Default EnableHealthCheck dovrebbe essere True');
 end;
 
-procedure TRedisPoolTests.Test_PoolConfig_Validation_InvalidMin;
+procedure TvmRedisPoolTests.Test_PoolConfig_Validation_InvalidMin;
 var
-  lConfig: TRedisPoolConfig;
+  lConfig: TvmRedisPoolConfig;
 begin
   lConfig.MinConnections := -1;
 
@@ -247,9 +249,9 @@ begin
   );
 end;
 
-procedure TRedisPoolTests.Test_PoolConfig_Validation_MaxLessThanMin;
+procedure TvmRedisPoolTests.Test_PoolConfig_Validation_MaxLessThanMin;
 var
-  lConfig: TRedisPoolConfig;
+  lConfig: TvmRedisPoolConfig;
 begin
   lConfig.MinConnections := 5;
   lConfig.MaxConnections := 3;
@@ -263,9 +265,9 @@ begin
   );
 end;
 
-procedure TRedisPoolTests.Test_PoolConfig_ResetOnRelease_DefaultAndCopy;
+procedure TvmRedisPoolTests.Test_PoolConfig_ResetOnRelease_DefaultAndCopy;
 var
-  lConfig, lCopy: TRedisPoolConfig;
+  lConfig, lCopy: TvmRedisPoolConfig;
 begin
   Assert.IsFalse(lConfig.ResetOnRelease, 'Default ResetOnRelease dovrebbe essere False');
 
@@ -279,7 +281,7 @@ end;
 
 {$REGION 'Test Inizializzazione'}
 
-procedure TRedisPoolTests.Test_Pool_Initialize_Success;
+procedure TvmRedisPoolTests.Test_Pool_Initialize_Success;
 begin
   FPool.Initialize;
 
@@ -287,7 +289,7 @@ begin
   Assert.IsTrue(lStats.TotalConnections >= FPoolConfig.MinConnections, 'Pool dovrebbe avere almeno MinConnections');
 end;
 
-procedure TRedisPoolTests.Test_Pool_Initialize_CreatesMinConnections;
+procedure TvmRedisPoolTests.Test_Pool_Initialize_CreatesMinConnections;
 begin
   FPool.Initialize;
 
@@ -297,7 +299,7 @@ begin
   Assert.AreEqual(FPoolConfig.MinConnections, lStats.IdleConnections, 'Tutte le connessioni dovrebbero essere idle');
 end;
 
-procedure TRedisPoolTests.Test_Pool_Initialize_AlreadyInitialized;
+procedure TvmRedisPoolTests.Test_Pool_Initialize_AlreadyInitialized;
 begin
   FPool.Initialize;
   var lStatsFirst := FPool.GetStats;
@@ -313,9 +315,9 @@ end;
 
 {$REGION 'Test Acquisizione/Rilascio'}
 
-procedure TRedisPoolTests.Test_Pool_AcquireRelease_SingleConnection;
+procedure TvmRedisPoolTests.Test_Pool_AcquireRelease_SingleConnection;
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
 begin
   FPool.Initialize;
 
@@ -332,9 +334,9 @@ begin
   Assert.AreEqual(0, lStats.ActiveConnections, 'Nessuna connessione dovrebbe essere attiva');
 end;
 
-procedure TRedisPoolTests.Test_Pool_Acquire_MultipleConnections;
+procedure TvmRedisPoolTests.Test_Pool_Acquire_MultipleConnections;
 var
-  lClients: TArray<IRedisClient>;
+  lClients: TArray<IvmRedisClient>;
 begin
   FPool.Initialize;
   SetLength(lClients, 3);
@@ -349,9 +351,9 @@ begin
     FPool.ReleaseConnection(lClients[I]);
 end;
 
-procedure TRedisPoolTests.Test_Pool_Acquire_ReusesIdleConnections;
+procedure TvmRedisPoolTests.Test_Pool_Acquire_ReusesIdleConnections;
 var
-  lClient1, lClient2: IRedisClient;
+  lClient1, lClient2: IvmRedisClient;
 begin
   FPool.Initialize;
 
@@ -368,9 +370,9 @@ begin
   FPool.ReleaseConnection(lClient2);
 end;
 
-procedure TRedisPoolTests.Test_Pool_Acquire_CreatesNewWhenNeeded;
+procedure TvmRedisPoolTests.Test_Pool_Acquire_CreatesNewWhenNeeded;
 var
-  lClients: TArray<IRedisClient>;
+  lClients: TArray<IvmRedisClient>;
 begin
   FPool.Initialize;
 
@@ -387,11 +389,11 @@ begin
     FPool.ReleaseConnection(lClients[I]);
 end;
 
-procedure TRedisPoolTests.Test_Pool_Acquire_TimeoutWhenPoolSaturated;
+procedure TvmRedisPoolTests.Test_Pool_Acquire_TimeoutWhenPoolSaturated;
 var
-  lClients: TArray<IRedisClient>;
-  lFastConfig: TRedisPoolConfig;
-  lFastPool: IRedisConnectionPool;
+  lClients: TArray<IvmRedisClient>;
+  lFastConfig: TvmRedisPoolConfig;
+  lFastPool: IvmRedisConnectionPool;
 begin
   // Pool con 1 sola connessione e timeout brevissimo
   lFastConfig.MinConnections := 1;
@@ -399,10 +401,10 @@ begin
   lFastConfig.AcquireTimeout := 100;  // 100ms
 
   // Utilizzo di Grijjy come Transport
-  lFastPool := TRedisConnectionPool.New(lFastConfig, FRedisConfig, nil, 'grijjy');
+  lFastPool := TvmRedisConnectionPool.New(lFastConfig, FRedisConfig, nil, 'grijjy');
 
   // Utilizzo di Synapse come Transport
-//  lFastPool := TRedisConnectionPool.New(lFastConfig, FRedisConfig, nil, 'synapse');
+//  lFastPool := TvmRedisConnectionPool.New(lFastConfig, FRedisConfig, nil, 'synapse');
 
   lFastPool.Initialize;
 
@@ -416,21 +418,21 @@ begin
     begin
       lFastPool.AcquireConnection;
     end,
-    ERedisTimeoutException, 'Dovrebbe sollevare ERedisTimeoutException se il pool è saturo'
+    EvmRedisTimeoutException, 'Dovrebbe sollevare EvmRedisTimeoutException se il pool è saturo'
   );
 
   lFastPool.ReleaseConnection(lClients[0]);
   lFastPool.Shutdown;
 end;
 
-procedure TRedisPoolTests.Test_Pool_Release_InvalidConnection;
+procedure TvmRedisPoolTests.Test_Pool_Release_InvalidConnection;
 var
-  lOtherClient: IRedisClient;
+  lOtherClient: IvmRedisClient;
 begin
   FPool.Initialize;
 
   // Tenta di rilasciare una connessione non appartenente al pool
-  lOtherClient := TRedisClient.New(FRedisConfig);
+  lOtherClient := TvmRedisClient.New(FRedisConfig);
   lOtherClient.Connect;
 
   Assert.WillNotRaise(
@@ -449,9 +451,9 @@ end;
 
 {$REGION 'Test AcquireConnectionOnDb'}
 
-procedure TRedisPoolTests.Test_Pool_AcquireOnDb_DefaultDb;
+procedure TvmRedisPoolTests.Test_Pool_AcquireOnDb_DefaultDb;
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
 begin
   FPool.Initialize;
 
@@ -463,9 +465,9 @@ begin
   FPool.ReleaseConnection(lClient);
 end;
 
-procedure TRedisPoolTests.Test_Pool_AcquireOnDb_SpecificDb;
+procedure TvmRedisPoolTests.Test_Pool_AcquireOnDb_SpecificDb;
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
 begin
   FPool.Initialize;
 
@@ -484,11 +486,11 @@ begin
   FPool.ReleaseConnection(lClient);
 end;
 
-procedure TRedisPoolTests.Test_Pool_AcquireOnDb_IsolationBetweenDbs;
+procedure TvmRedisPoolTests.Test_Pool_AcquireOnDb_IsolationBetweenDbs;
 const
   TEST_KEY = 'test:pool:isolation:key';
 var
-  lClientDb0, lClientDb1: IRedisClient;
+  lClientDb0, lClientDb1: IvmRedisClient;
 begin
   FPool.Initialize;
 
@@ -508,11 +510,11 @@ begin
   FPool.ReleaseConnection(lClientDb1);
 end;
 
-procedure TRedisPoolTests.Test_Pool_AcquireOnDb_ReleasedConnectionRestoredToDb0;
+procedure TvmRedisPoolTests.Test_Pool_AcquireOnDb_ReleasedConnectionRestoredToDb0;
 const
   TEST_KEY = 'test:pool:dbrestore:key';
 var
-  lClientDb1, lClientDb0: IRedisClient;
+  lClientDb1, lClientDb0: IvmRedisClient;
 begin
   FPool.Initialize;
 
@@ -535,25 +537,25 @@ begin
   FPool.ReleaseConnection(lClientDb0);
 end;
 
-procedure TRedisPoolTests.Test_Pool_AcquireOnDb_InvalidDb_DoesNotLeakSlots;
+procedure TvmRedisPoolTests.Test_Pool_AcquireOnDb_InvalidDb_DoesNotLeakSlots;
 const
   INVALID_DB = 9999; // fuori dal range "databases" del server (default 16)
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
 begin
   FPool.Initialize;
 
   // Ogni SELECT fallita non deve lasciare la connessione marcata InUse (#6).
   // Con il bug, dopo MaxConnections tentativi il pool è saturo e la chiamata
-  // successiva va in timeout (ERedisTimeoutException invece di ERedisConnectionException).
+  // successiva va in timeout (EvmRedisTimeoutException invece di EvmRedisConnectionException).
   for var I := 1 to FPoolConfig.MaxConnections + 1 do
     Assert.WillRaise(
       procedure
       begin
         FPool.AcquireConnectionOnDb(INVALID_DB);
       end,
-      ERedisConnectionException,
-      Format('Tentativo %d: AcquireConnectionOnDb(%d) dovrebbe sollevare ERedisConnectionException', [I, INVALID_DB]));
+      EvmRedisConnectionException,
+      Format('Tentativo %d: AcquireConnectionOnDb(%d) dovrebbe sollevare EvmRedisConnectionException', [I, INVALID_DB]));
 
   // Il pool deve essere ancora utilizzabile
   lClient := FPool.AcquireConnectionOnDb(1);
@@ -567,12 +569,12 @@ end;
 
 {$REGION 'Test Stato della connessione al rilascio'}
 
-procedure TRedisPoolTests.Test_Pool_Release_AfterClientSelect_DbRestored;
+procedure TvmRedisPoolTests.Test_Pool_Release_AfterClientSelect_DbRestored;
 const
   TEST_KEY = 'test:pool:dirtydb:key';
 var
-  lPool: IRedisConnectionPool;
-  lFirst, lSecond: IRedisClient;
+  lPool: IvmRedisConnectionPool;
+  lFirst, lSecond: IvmRedisClient;
 begin
   lPool := NewSingleConnectionPool(False);
   try
@@ -597,12 +599,12 @@ begin
   end;
 end;
 
-procedure TRedisPoolTests.Test_Pool_Release_WithOpenMulti_DestroysConnection;
+procedure TvmRedisPoolTests.Test_Pool_Release_WithOpenMulti_DestroysConnection;
 const
   TEST_KEY = 'test:pool:dirtymulti:key';
 var
-  lPool: IRedisConnectionPool;
-  lFirst, lSecond: IRedisClient;
+  lPool: IvmRedisConnectionPool;
+  lFirst, lSecond: IvmRedisClient;
 begin
   lPool := NewSingleConnectionPool(False);
   try
@@ -628,10 +630,10 @@ begin
   end;
 end;
 
-procedure TRedisPoolTests.Test_Pool_Release_WithOpenWatch_DestroysConnection;
+procedure TvmRedisPoolTests.Test_Pool_Release_WithOpenWatch_DestroysConnection;
 var
-  lPool: IRedisConnectionPool;
-  lFirst, lSecond: IRedisClient;
+  lPool: IvmRedisConnectionPool;
+  lFirst, lSecond: IvmRedisClient;
 begin
   lPool := NewSingleConnectionPool(False);
   try
@@ -652,10 +654,10 @@ begin
   end;
 end;
 
-procedure TRedisPoolTests.Test_Pool_ResetOnRelease_ResetsStateAndKeepsConnection;
+procedure TvmRedisPoolTests.Test_Pool_ResetOnRelease_ResetsStateAndKeepsConnection;
 var
-  lPool: IRedisConnectionPool;
-  lFirst, lSecond: IRedisClient;
+  lPool: IvmRedisConnectionPool;
+  lFirst, lSecond: IvmRedisClient;
 begin
   // RESET richiede Redis 6.2+
   lPool := NewSingleConnectionPool(True);
@@ -682,7 +684,7 @@ end;
 
 {$REGION 'Test Concorrenza'}
 
-procedure TRedisPoolTests.Test_Pool_ThreadSafety_MultipleThreads;
+procedure TvmRedisPoolTests.Test_Pool_ThreadSafety_MultipleThreads;
 const
   THREAD_COUNT = 10;
   OPS_PER_THREAD = 20;
@@ -703,7 +705,7 @@ begin
         procedure
         var
           I: Integer;
-          lClient: IRedisClient;
+          lClient: IvmRedisClient;
         begin
           for I := 1 to OPS_PER_THREAD do
           begin
@@ -749,7 +751,7 @@ begin
   end;
 end;
 
-procedure TRedisPoolTests.Test_Pool_ThreadSafety_AcquireReleaseConcurrent;
+procedure TvmRedisPoolTests.Test_Pool_ThreadSafety_AcquireReleaseConcurrent;
 const
   ITERATIONS = 100;
 var
@@ -761,7 +763,7 @@ begin
     procedure
     var
       I: Integer;
-      lClient: IRedisClient;
+      lClient: IvmRedisClient;
     begin
       for I := 1 to ITERATIONS do
       begin
@@ -776,7 +778,7 @@ begin
     procedure
     var
       I: Integer;
-      lClient: IRedisClient;
+      lClient: IvmRedisClient;
     begin
       for I := 1 to ITERATIONS do
       begin
@@ -803,7 +805,7 @@ end;
 
 {$REGION 'Test Statistiche'}
 
-procedure TRedisPoolTests.Test_Pool_Stats_InitialState;
+procedure TvmRedisPoolTests.Test_Pool_Stats_InitialState;
 begin
   FPool.Initialize;
 
@@ -814,9 +816,9 @@ begin
   Assert.AreEqual(Int64(0), lStats.TotalReleased,  'Nessun rilascio');
 end;
 
-procedure TRedisPoolTests.Test_Pool_Stats_AfterAcquire;
+procedure TvmRedisPoolTests.Test_Pool_Stats_AfterAcquire;
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
 begin
   FPool.Initialize;
 
@@ -830,9 +832,9 @@ begin
   FPool.ReleaseConnection(lClient);
 end;
 
-procedure TRedisPoolTests.Test_Pool_Stats_CountersUpdate;
+procedure TvmRedisPoolTests.Test_Pool_Stats_CountersUpdate;
 var
-  lClients: TArray<IRedisClient>;
+  lClients: TArray<IvmRedisClient>;
   I: Integer;
 const
   COUNT = 5;
@@ -859,14 +861,14 @@ end;
 
 {$REGION 'Test Helper'}
 
-procedure TRedisPoolTests.Test_PoolHelper_ExecuteFunction;
+procedure TvmRedisPoolTests.Test_PoolHelper_ExecuteFunction;
 var
   lResult: string;
 begin
   FPool.Initialize;
 
-  lResult := TRedisPoolHelper.Execute<string>(FPool,
-    function(aClient: IRedisClient): string
+  lResult := TvmRedisPoolHelper.Execute<string>(FPool,
+    function(aClient: IvmRedisClient): string
     begin
       aClient.SetValue('test:helper:key', 'test value');
       Result := aClient.Get('test:helper:key').AsString;
@@ -876,23 +878,23 @@ begin
   Assert.AreEqual('test value', lResult, 'Helper dovrebbe restituire risultato corretto');
   Assert.AreEqual(0, FPool.GetStats.ActiveConnections, 'Connessione dovrebbe essere rilasciata');
 
-  TRedisPoolHelper.Execute(FPool,
-    procedure(aClient: IRedisClient)
+  TvmRedisPoolHelper.Execute(FPool,
+    procedure(aClient: IvmRedisClient)
     begin
       aClient.Del(['test:helper:key']);
     end
   );
 end;
 
-procedure TRedisPoolTests.Test_PoolHelper_ExecuteProcedure;
+procedure TvmRedisPoolTests.Test_PoolHelper_ExecuteProcedure;
 var
   lExecuted: Boolean;
 begin
   FPool.Initialize;
   lExecuted := False;
 
-  TRedisPoolHelper.Execute(FPool,
-    procedure(AClient: IRedisClient)
+  TvmRedisPoolHelper.Execute(FPool,
+    procedure(AClient: IvmRedisClient)
     begin
       AClient.SetValue('test:helper:proc', 'executed');
       lExecuted := True;
@@ -901,23 +903,23 @@ begin
 
   Assert.IsTrue(lExecuted, 'Procedura dovrebbe essere stata eseguita');
 
-  TRedisPoolHelper.Execute(FPool,
-    procedure(aClient: IRedisClient)
+  TvmRedisPoolHelper.Execute(FPool,
+    procedure(aClient: IvmRedisClient)
     begin
       aClient.Del(['test:helper:proc']);
     end
   );
 end;
 
-procedure TRedisPoolTests.Test_PoolHelper_ExceptionHandling;
+procedure TvmRedisPoolTests.Test_PoolHelper_ExceptionHandling;
 begin
   FPool.Initialize;
 
   Assert.WillRaise(
     procedure
     begin
-      TRedisPoolHelper.Execute(FPool,
-        procedure(aClient: IRedisClient)
+      TvmRedisPoolHelper.Execute(FPool,
+        procedure(aClient: IvmRedisClient)
         begin
           raise Exception.Create('Test exception');
         end
@@ -933,14 +935,14 @@ end;
 
 {$ENDREGION}
 
-{$REGION 'Test TPooledRedisClient'}
+{$REGION 'Test TvmPooledRedisClient'}
 
-procedure TRedisPoolTests.Test_PooledClient_AutoRelease;
+procedure TvmRedisPoolTests.Test_PooledClient_AutoRelease;
 begin
   FPool.Initialize;
 
   begin
-    var lPooledClient := TPooledRedisClient.Create(FPool);
+    var lPooledClient := TvmPooledRedisClient.Create(FPool);
 
     Assert.IsNotNull(lPooledClient.Client,    'Client dovrebbe essere acquisito');
     Assert.IsTrue(lPooledClient.Acquired,      'Acquired dovrebbe essere True');
@@ -951,13 +953,13 @@ begin
   Assert.AreEqual(0, FPool.GetStats.ActiveConnections, 'Connessione dovrebbe essere auto-rilasciata');
 end;
 
-procedure TRedisPoolTests.Test_PooledClient_ManualRelease;
+procedure TvmRedisPoolTests.Test_PooledClient_ManualRelease;
 var
-  lPooledClient: TPooledRedisClient;
+  lPooledClient: TvmPooledRedisClient;
 begin
   FPool.Initialize;
 
-  lPooledClient := TPooledRedisClient.Create(FPool);
+  lPooledClient := TvmPooledRedisClient.Create(FPool);
   Assert.IsTrue(lPooledClient.Acquired);
 
   lPooledClient.Release;
@@ -971,7 +973,7 @@ end;
 
 {$REGION 'Test Shutdown'}
 
-procedure TRedisPoolTests.Test_Pool_Shutdown_ClosesAllConnections;
+procedure TvmRedisPoolTests.Test_Pool_Shutdown_ClosesAllConnections;
 begin
   FPool.Initialize;
 
@@ -985,7 +987,7 @@ begin
   Assert.AreEqual(0, FPool.GetStats.TotalConnections, 'Tutte le connessioni dovrebbero essere chiuse');
 end;
 
-procedure TRedisPoolTests.Test_Pool_Shutdown_AlreadyShutdown;
+procedure TvmRedisPoolTests.Test_Pool_Shutdown_AlreadyShutdown;
 begin
   FPool.Initialize;
   FPool.Shutdown;

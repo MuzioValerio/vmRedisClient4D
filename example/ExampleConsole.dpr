@@ -32,36 +32,36 @@ uses
   System.Classes,
   System.SysUtils,
   Vcl.Dialogs,
-  Redis.Client.Intf in '..\sources\Redis.Client.Intf.pas',
-  Redis.Client in '..\sources\Redis.Client.pas',
-  Redis.Connection.Config in '..\sources\Redis.Connection.Config.pas',
-  Redis.HealthCheck in '..\sources\Redis.HealthCheck.pas',
-  Redis.Logger.Empty in '..\sources\Redis.Logger.Empty.pas',
-  Redis.Pool in '..\sources\Redis.Pool.pas',
-  Redis.Protocol in '..\sources\Redis.Protocol.pas',
-  Redis.PubSub in '..\sources\Redis.PubSub.pas',
-  Redis.Response in '..\sources\Redis.Response.pas',
-  Redis.Transport.Intf in '..\sources\Redis.Transport.Intf.pas',
-  Redis.Transport.Registry in '..\sources\Redis.Transport.Registry.pas',
-  Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas',
-  Redis.Types in '..\sources\Redis.Types.pas',
-  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas';
+  vmRedis.Client.Intf in '..\sources\vmRedis.Client.Intf.pas',
+  vmRedis.Client in '..\sources\vmRedis.Client.pas',
+  vmRedis.Connection.Config in '..\sources\vmRedis.Connection.Config.pas',
+  vmRedis.HealthCheck in '..\sources\vmRedis.HealthCheck.pas',
+  vmRedis.Logger.Empty in '..\sources\vmRedis.Logger.Empty.pas',
+  vmRedis.Pool in '..\sources\vmRedis.Pool.pas',
+  vmRedis.Protocol in '..\sources\vmRedis.Protocol.pas',
+  vmRedis.PubSub in '..\sources\vmRedis.PubSub.pas',
+  vmRedis.Response in '..\sources\vmRedis.Response.pas',
+  vmRedis.Transport.Intf in '..\sources\vmRedis.Transport.Intf.pas',
+  vmRedis.Transport.Registry in '..\sources\vmRedis.Transport.Registry.pas',
+  vmRedis.Transport.Synapse in '..\sources\vmRedis.Transport.Synapse.pas',
+  vmRedis.Types in '..\sources\vmRedis.Types.pas',
+  vmRedis.Transport.Grijjy in '..\sources\vmRedis.Transport.Grijjy.pas';
 
 var
-  Response: IRedisResponse;
+  Response: IvmRedisResponse;
 
 procedure esempio_1;
 var
-  lConfig: TRedisConnectionConfig;
+  lConfig: TvmRedisConnectionConfig;
 begin
   writeln(lConfig.Host);
   Writeln(lConfig.Port);
 
   // usa il Transport Grijjy per la connessione
-//  var lRedisClient := TRedisClient.New(lConfig, nil, 'grijjy');
+//  var lRedisClient := TvmRedisClient.New(lConfig, nil, 'grijjy');
 
   // usa il Transport Synapse per la connessione
-  var lRedisClient := TRedisClient.New(lConfig, nil, 'synapse');
+  var lRedisClient := TvmRedisClient.New(lConfig, nil, 'synapse');
 
   lRedisClient.Connect;
   if lRedisClient.IsConnected then

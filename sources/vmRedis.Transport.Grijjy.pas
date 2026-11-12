@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Transport.Grijjy
+ Unit Name: vmRedis.Transport.Grijjy
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio / Claude AI Assistant
  Date:      02-apr-2026
@@ -32,11 +32,13 @@
    - Unità necessarie: Grijjy.SocketPool.Win/Linux, Grijjy.OpenSSL
 
    Utilizzo:
-     uses Redis.Transport.Grijjy;
-     var Transport := TRedisTransportRegistry.Acquire('grijjy', Config, Logger);
+     uses vmRedis.Transport.Grijjy;
+     var Transport := TvmRedisTransportRegistry.Acquire('grijjy', Config, Logger);
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Transport.Grijjy;
+unit vmRedis.Transport.Grijjy;
 
 interface
 
@@ -52,20 +54,20 @@ uses
   Grijjy.SocketPool.Linux
   {$ENDIF}
   ,Grijjy.OpenSSL,
-  Redis.Types,
-  Redis.Protocol,
-  Redis.Transport.Intf,
-  Redis.Transport.Registry,
-  Redis.Connection.Config;
+  vmRedis.Types,
+  vmRedis.Protocol,
+  vmRedis.Transport.Intf,
+  vmRedis.Transport.Registry,
+  vmRedis.Connection.Config;
 
 type
-  TRedisGrijjyTransport = class(TInterfacedObject, IRedisTransport)
+  TvmRedisGrijjyTransport = class(TInterfacedObject, IvmRedisTransport)
   strict private
     FSocket: TgoSocketConnection;
     FManager: TgoClientSocketManager;
-    FConfig: TRedisConnectionConfig;
+    FConfig: TvmRedisConnectionConfig;
     FConnected: Boolean;
-    FLogger: IRedisLogger;
+    FLogger: IvmRedisLogger;
 
     // Pipeline buffer
     FPipelineBuffer: TMemoryStream;
@@ -91,9 +93,9 @@ type
     function  ReadRawLine: string;
     function  ReadByteFromBuffer: Byte;
   private
-    constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger); reintroduce;
+    constructor Create(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger); reintroduce;
 
-    { IRedisTransport }
+    { IvmRedisTransport }
     procedure Connect;
     procedure Disconnect;
     function  IsConnected: Boolean;
@@ -103,27 +105,27 @@ type
     function  FlushPipeline: TBytes;
     function  IsPipelining: Boolean;
 
-    { IRedisDataReader }
+    { IvmRedisDataReader }
     function ReadLine: string;
     function ReadBytes(aCount: Integer): TBytes;
   public
     destructor Destroy; override;
-    class function New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger): IRedisTransport;
+    class function New(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger): IvmRedisTransport;
   end;
 
 implementation
 
 uses
-  Redis.Logger.Empty;
+  vmRedis.Logger.Empty;
 
-{ TRedisGrijjyTransport }
+{ TvmRedisGrijjyTransport }
 
-class function TRedisGrijjyTransport.New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger): IRedisTransport;
+class function TvmRedisGrijjyTransport.New(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger): IvmRedisTransport;
 begin
-  Result := TRedisGrijjyTransport.Create(aConfig, aLogger);
+  Result := TvmRedisGrijjyTransport.Create(aConfig, aLogger);
 end;
 
-constructor TRedisGrijjyTransport.Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger);
+constructor TvmRedisGrijjyTransport.Create(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger);
 begin
   inherited Create;
   aConfig.Validate;
@@ -145,7 +147,7 @@ begin
   Log('Transport Grijjy creato per ' + FConfig.Host + ':' + IntToStr(FConfig.Port));
 end;
 
-destructor TRedisGrijjyTransport.Destroy;
+destructor TvmRedisGrijjyTransport.Destroy;
 begin
   Disconnect;
   FPipelineBuffer.Free;
@@ -155,7 +157,7 @@ begin
   inherited;
 end;
 
-procedure TRedisGrijjyTransport.Log(const aMessage: string; aIsError: Boolean);
+procedure TvmRedisGrijjyTransport.Log(const aMessage: string; aIsError: Boolean);
 begin
   if aIsError then
     FLogger.LogError(aMessage)
@@ -163,14 +165,14 @@ begin
     FLogger.LogInfo(aMessage);
 end;
 
-procedure TRedisGrijjyTransport.SetupSSL;
+procedure TvmRedisGrijjyTransport.SetupSSL;
 begin
   if not FConfig.UseSSL then
     Exit;
 
   try
     if FSocket = nil then
-      raise ERedisConnectionException.Create('Socket non inizializzato per SSL');
+      raise EvmRedisConnectionException.Create('Socket non inizializzato per SSL');
 
     FSocket.SSL := True;
 
@@ -190,24 +192,24 @@ begin
     on E: Exception do
     begin
       Log('Errore configurazione SSL: ' + E.Message, True);
-      raise ERedisConnectionException.Create('Impossibile configurare SSL: ' + E.Message);
+      raise EvmRedisConnectionException.Create('Impossibile configurare SSL: ' + E.Message);
     end;
   end;
 end;
 
-procedure TRedisGrijjyTransport.OnSocketConnected;
+procedure TvmRedisGrijjyTransport.OnSocketConnected;
 begin
   Log('Socket Grijjy connesso');
 end;
 
-procedure TRedisGrijjyTransport.OnSocketDisconnected;
+procedure TvmRedisGrijjyTransport.OnSocketDisconnected;
 begin
   FConnected := False;
   Log('Socket Grijjy disconnesso');
   FReadEvent.SetEvent;
 end;
 
-procedure TRedisGrijjyTransport.OnSocketRecv(const aBuffer: Pointer; const aSize: Integer);
+procedure TvmRedisGrijjyTransport.OnSocketRecv(const aBuffer: Pointer; const aSize: Integer);
 var
   lCurrentSize: Integer;
   lNewSize: Integer;
@@ -228,13 +230,13 @@ begin
   FReadEvent.SetEvent;
 end;
 
-procedure TRedisGrijjyTransport.InternalConnect;
+procedure TvmRedisGrijjyTransport.InternalConnect;
 begin
   try
     FSocket := FManager.Request(FConfig.Host, FConfig.Port);
 
     if FSocket = nil then
-      raise ERedisConnectionException.Create('Impossibile ottenere socket dal manager');
+      raise EvmRedisConnectionException.Create('Impossibile ottenere socket dal manager');
 
     FSocket.OnConnected := OnSocketConnected;
     FSocket.OnDisconnected := OnSocketDisconnected;
@@ -243,7 +245,7 @@ begin
       SetupSSL;
 
     if not FSocket.Connect then
-      raise ERedisConnectionException.Create('Errore connessione socket Grijjy');
+      raise EvmRedisConnectionException.Create('Errore connessione socket Grijjy');
 
     var lStart := Now;
     var lTimeoutSeconds := FConfig.ConnectionTimeout / 1000;
@@ -251,7 +253,7 @@ begin
       Sleep(10);
 
     if FSocket.State <> TgoConnectionState.Connected then
-      raise ERedisConnectionException.Create('Timeout connessione Redis');
+      raise EvmRedisConnectionException.Create('Timeout connessione Redis');
 
     Log('Connesso a Redis: ' + FConfig.Host + ':' + IntToStr(FConfig.Port));
   except
@@ -265,7 +267,7 @@ begin
   end;
 end;
 
-procedure TRedisGrijjyTransport.AuthenticateWithRetry;
+procedure TvmRedisGrijjyTransport.AuthenticateWithRetry;
 var
   lRawResp: string;
   lRetries: Integer;
@@ -292,11 +294,11 @@ begin
           Log('Autenticazione completata con successo');
         end
         else if lRawResp.StartsWith('-') then
-          raise ERedisConnectionException.Create('Autenticazione rifiutata dal server: ' + lRawResp.Substring(1))
+          raise EvmRedisConnectionException.Create('Autenticazione rifiutata dal server: ' + lRawResp.Substring(1))
         else
-          raise ERedisConnectionException.Create('Risposta autenticazione inattesa: ' + lRawResp);
+          raise EvmRedisConnectionException.Create('Risposta autenticazione inattesa: ' + lRawResp);
       except
-        on E: ERedisConnectionException do
+        on E: EvmRedisConnectionException do
           raise;
         on E: Exception do
         begin
@@ -304,7 +306,7 @@ begin
           if lRetries > FConfig.MaxRetries then
           begin
             Log('Autenticazione fallita dopo ' + IntToStr(lRetries) + ' tentativi', True);
-            raise ERedisConnectionException.Create('Autenticazione fallita: ' + E.Message);
+            raise EvmRedisConnectionException.Create('Autenticazione fallita: ' + E.Message);
           end;
           Sleep(FConfig.RetryDelayMs * lRetries);
         end;
@@ -317,12 +319,12 @@ begin
     SendCommand(['SELECT', IntToStr(FConfig.Database)]);
     var lResp := ReadRawLine;
     if not lResp.StartsWith('+') then
-      raise ERedisConnectionException.Create('Selezione database ' + IntToStr(FConfig.Database) + ' fallita: ' + lResp);
+      raise EvmRedisConnectionException.Create('Selezione database ' + IntToStr(FConfig.Database) + ' fallita: ' + lResp);
     Log('Database ' + IntToStr(FConfig.Database) + ' selezionato');
   end;
 end;
 
-procedure TRedisGrijjyTransport.SetClientName;
+procedure TvmRedisGrijjyTransport.SetClientName;
 begin
   if FConfig.ClientName.Trim = '' then 
     Exit;
@@ -340,7 +342,7 @@ begin
   end;
 end;
 
-procedure TRedisGrijjyTransport.Connect;
+procedure TvmRedisGrijjyTransport.Connect;
 var
   lConnected: Boolean;
   lRetries: Integer;
@@ -375,7 +377,7 @@ begin
         if lRetries > FConfig.MaxRetries then
         begin
           Log('Connessione fallita dopo ' + IntToStr(lRetries) + ' tentativi', True);
-          raise ERedisConnectionException.CreateFmt(
+          raise EvmRedisConnectionException.CreateFmt(
             'Impossibile connettersi a Redis dopo %d tentativi. Errore: %s',
             [lRetries, E.Message]);
         end;
@@ -387,7 +389,7 @@ begin
   end;
 end;
 
-procedure TRedisGrijjyTransport.Disconnect;
+procedure TvmRedisGrijjyTransport.Disconnect;
 begin
   if Assigned(FSocket) and (FSocket.State <> TgoConnectionState.Disconnected) then
   begin
@@ -423,30 +425,30 @@ begin
   FReadEvent.ResetEvent;
 end;
 
-function TRedisGrijjyTransport.IsConnected: Boolean;
+function TvmRedisGrijjyTransport.IsConnected: Boolean;
 begin
   Result := FConnected and Assigned(FSocket) and (FSocket.State = TgoConnectionState.Connected);
 end;
 
-procedure TRedisGrijjyTransport.Send(const aData: TBytes);
+procedure TvmRedisGrijjyTransport.Send(const aData: TBytes);
 begin
   if not IsConnected then
-    raise ERedisConnectionException.Create('Non connesso al server Redis');
+    raise EvmRedisConnectionException.Create('Non connesso al server Redis');
 
   try
     if not FSocket.Send(aData) then
-      raise ERedisConnectionException.Create('Errore invio dati al socket');
+      raise EvmRedisConnectionException.Create('Errore invio dati al socket');
   except
     on E: Exception do
     begin
       FConnected := False;
       Log('Errore invio dati: ' + E.Message, True);
-      raise ERedisConnectionException.Create('Errore invio comando: ' + E.Message);
+      raise EvmRedisConnectionException.Create('Errore invio comando: ' + E.Message);
     end;
   end;
 end;
 
-procedure TRedisGrijjyTransport.SendCommand(const aParts: array of string);
+procedure TvmRedisGrijjyTransport.SendCommand(const aParts: array of string);
 begin
   var lCmdStr := '';
   for var I := Low(aParts) to High(aParts) do
@@ -460,17 +462,17 @@ begin
   end;
   FLogger.LogCommand(lCmdStr);
 
-  Send(TRedisCommandSerializer.Serialize(aParts));
+  Send(TvmRedisCommandSerializer.Serialize(aParts));
 end;
 
-procedure TRedisGrijjyTransport.PipelineCommand(const aParts: array of string);
+procedure TvmRedisGrijjyTransport.PipelineCommand(const aParts: array of string);
 var
   lData: TBytes;
 begin
   if not IsConnected then
-    raise ERedisConnectionException.Create('Non connesso al server Redis');
+    raise EvmRedisConnectionException.Create('Non connesso al server Redis');
 
-  lData := TRedisCommandSerializer.Serialize(aParts);
+  lData := TvmRedisCommandSerializer.Serialize(aParts);
   FPipelineBuffer.Write(lData[0], Length(lData));
   Inc(FPipelineCount);
   FPipelining := True;
@@ -478,7 +480,7 @@ begin
   FLogger.LogDebug(Format('Pipeline buffer: %d comandi accodati', [FPipelineCount]));
 end;
 
-function TRedisGrijjyTransport.FlushPipeline: TBytes;
+function TvmRedisGrijjyTransport.FlushPipeline: TBytes;
 var
   lCount: Integer;
 begin
@@ -502,12 +504,12 @@ begin
   FLogger.LogDebug(Format('Pipeline flushed: %d comandi inviati', [lCount]));
 end;
 
-function TRedisGrijjyTransport.IsPipelining: Boolean;
+function TvmRedisGrijjyTransport.IsPipelining: Boolean;
 begin
   Result := FPipelining;
 end;
 
-function TRedisGrijjyTransport.ReadByteFromBuffer: Byte;
+function TvmRedisGrijjyTransport.ReadByteFromBuffer: Byte;
 begin
   while True do
   begin
@@ -536,14 +538,14 @@ begin
     end;
 
     if FReadEvent.WaitFor(FConfig.ReadTimeout) = wrTimeout then
-      raise ERedisTimeoutException.Create('Timeout lettura dati dal server Redis');
+      raise EvmRedisTimeoutException.Create('Timeout lettura dati dal server Redis');
 
     if not FConnected then
-      raise ERedisConnectionException.Create('Connessione chiusa dal server durante lettura');
+      raise EvmRedisConnectionException.Create('Connessione chiusa dal server durante lettura');
   end;
 end;
 
-function TRedisGrijjyTransport.ReadRawLine: string;
+function TvmRedisGrijjyTransport.ReadRawLine: string;
 var
   lLine: TBytes;
   lCount: Integer;
@@ -577,16 +579,16 @@ begin
   Result := TEncoding.UTF8.GetString(lLine);
 end;
 
-function TRedisGrijjyTransport.ReadLine: string;
+function TvmRedisGrijjyTransport.ReadLine: string;
 begin
   if not IsConnected then
-    raise ERedisConnectionException.Create('Non connesso al server Redis');
+    raise EvmRedisConnectionException.Create('Non connesso al server Redis');
 
   try
     Result := ReadRawLine;
     FLogger.LogResponse(Result);
   except
-    on E: ERedisTimeoutException do
+    on E: EvmRedisTimeoutException do
     begin
       Log('Timeout lettura risposta', True);
       FConnected := False;
@@ -596,17 +598,17 @@ begin
     begin
       FConnected := False;
       Log('Errore lettura risposta: ' + E.Message, True);
-      raise ERedisConnectionException.Create('Errore lettura risposta: ' + E.Message);
+      raise EvmRedisConnectionException.Create('Errore lettura risposta: ' + E.Message);
     end;
   end;
 end;
 
-function TRedisGrijjyTransport.ReadBytes(aCount: Integer): TBytes;
+function TvmRedisGrijjyTransport.ReadBytes(aCount: Integer): TBytes;
 var
   lRead: Integer;
 begin
   if not IsConnected then
-    raise ERedisConnectionException.Create('Non connesso al server Redis');
+    raise EvmRedisConnectionException.Create('Non connesso al server Redis');
 
   try
     SetLength(Result, aCount);
@@ -637,14 +639,14 @@ begin
       if lRead < aCount then
       begin
         if FReadEvent.WaitFor(FConfig.ReadTimeout) = wrTimeout then
-          raise ERedisTimeoutException.Create('Timeout lettura dati dal server Redis');
+          raise EvmRedisTimeoutException.Create('Timeout lettura dati dal server Redis');
         FReadEvent.ResetEvent;
       end;
     end;
 
     SetLength(Result, lRead);
   except
-    on E: ERedisTimeoutException do
+    on E: EvmRedisTimeoutException do
     begin
       Log('Timeout lettura bytes', True);
       FConnected := False;
@@ -654,7 +656,7 @@ begin
     begin
       FConnected := False;
       Log('Errore lettura bytes: ' + E.Message, True);
-      raise ERedisConnectionException.Create('Errore lettura dati: ' + E.Message);
+      raise EvmRedisConnectionException.Create('Errore lettura dati: ' + E.Message);
     end;
   end;
 end;
@@ -664,10 +666,10 @@ end;
 // ---------------------------------------------------------------------------
 
 initialization
-  TRedisTransportRegistry.RegisterProvider('grijjy',
-    function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport
+  TvmRedisTransportRegistry.RegisterProvider('grijjy',
+    function(const aConfig: TvmRedisConnectionConfig; const aLogger: IvmRedisLogger): IvmRedisTransport
     begin
-      Result := TRedisGrijjyTransport.New(aConfig, aLogger);
+      Result := TvmRedisGrijjyTransport.New(aConfig, aLogger);
     end);
 
 end.

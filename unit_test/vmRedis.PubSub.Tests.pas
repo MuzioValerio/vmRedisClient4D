@@ -1,6 +1,6 @@
 {-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.PubSub.Tests
+ Unit Name: vmRedis.PubSub.Tests
  Copyright (C) 2025-2030 Muzio Valerio
  Author: Muzio Valerio
  Date: 14-gen-2025
@@ -19,17 +19,19 @@
 
  Info:
   - Test DUnitX per Redis Pub/Sub
-       I publisher vengono ora creati tramite IRedisClient.CreatePublisher
-       e i subscriber tramite IRedisClient.CreateSubscriber, oltre alla
+       I publisher vengono ora creati tramite IvmRedisClient.CreatePublisher
+       e i subscriber tramite IvmRedisClient.CreateSubscriber, oltre alla
        costruzione diretta precedente.
 
  Purpose:
  History:
   - Update: 2026 - Allineamento alle interfacce aggiornate
 
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.PubSub.Tests;
+unit vmRedis.PubSub.Tests;
 
 interface
 
@@ -40,24 +42,24 @@ uses
   System.SyncObjs,
   System.Threading,
   System.Generics.Collections,
-  Redis.Client,
-  Redis.Client.Intf,
-  Redis.PubSub,
-  Redis.Connection.Config,
-  Redis.Types;
+  vmRedis.Client,
+  vmRedis.Client.Intf,
+  vmRedis.PubSub,
+  vmRedis.Connection.Config,
+  vmRedis.Types;
 
 type
   [TestFixture]
-  TRedisPubSubTests = class
+  TvmRedisPubSubTests = class
   private
-    FConfig: TRedisConnectionConfig;
-    FPublisher: IRedisPubSubPublisher;
-    FSubscriber: IRedisPubSubClient;
-    FReceivedMessages: TList<TRedisPubSubMessage>;
-    FSystemMessages: TList<TRedisPubSubMessage>;
+    FConfig: TvmRedisConnectionConfig;
+    FPublisher: IvmRedisPubSubPublisher;
+    FSubscriber: IvmRedisPubSubClient;
+    FReceivedMessages: TList<TvmRedisPubSubMessage>;
+    FSystemMessages: TList<TvmRedisPubSubMessage>;
     FMessageLock: TCriticalSection;
 
-    procedure OnMessageReceived(const aMessage: TRedisPubSubMessage);
+    procedure OnMessageReceived(const aMessage: TvmRedisPubSubMessage);
   public
     [Setup]
     procedure Setup;
@@ -117,7 +119,7 @@ type
     procedure Test_Listener_ReceiveInBackground;
 
     // -------------------------------------------------------------------------
-    // Test Factory Methods su IRedisClient
+    // Test Factory Methods su IvmRedisClient
     // -------------------------------------------------------------------------
     [Test]
     procedure Test_Client_CreatePublisher;
@@ -137,28 +139,28 @@ type
 
 implementation
 
-{ TRedisPubSubTests }
+{ TvmRedisPubSubTests }
 
-procedure TRedisPubSubTests.Setup;
+procedure TvmRedisPubSubTests.Setup;
 begin
-  FConfig := TRedisConnectionConfig.Localhost(0);
+  FConfig := TvmRedisConnectionConfig.Localhost(0);
   FConfig.ConnectionTimeout := 5000;
   FConfig.ReadTimeout := 5000;
 
 // Utilizzo di Grijjy come Transport
-  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'grijjy');
-  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'grijjy');
+  FPublisher := TvmRedisPubSubPublisher.Create(FConfig, nil, 'grijjy');
+  FSubscriber := TvmRedisPubSubClient.Create(FConfig, nil, 'grijjy');
 
   // Utilizzo Synapse come Transport
-//  FPublisher := TRedisPubSubPublisher.Create(FConfig, nil, 'synapse');
-//  FSubscriber := TRedisPubSubClient.Create(FConfig, nil, 'synapse');
+//  FPublisher := TvmRedisPubSubPublisher.Create(FConfig, nil, 'synapse');
+//  FSubscriber := TvmRedisPubSubClient.Create(FConfig, nil, 'synapse');
 
-  FReceivedMessages := TList<TRedisPubSubMessage>.Create;
-  FSystemMessages := TList<TRedisPubSubMessage>.Create;
+  FReceivedMessages := TList<TvmRedisPubSubMessage>.Create;
+  FSystemMessages := TList<TvmRedisPubSubMessage>.Create;
   FMessageLock := TCriticalSection.Create;
 end;
 
-procedure TRedisPubSubTests.TearDown;
+procedure TvmRedisPubSubTests.TearDown;
 begin
   // Prima unsubscribe (listener ancora attivo può leggere le conferme)
   if Assigned(FSubscriber) and FSubscriber.IsConnected then
@@ -186,7 +188,7 @@ begin
   FSystemMessages.Free;
 end;
 
-procedure TRedisPubSubTests.OnMessageReceived(const aMessage: TRedisPubSubMessage);
+procedure TvmRedisPubSubTests.OnMessageReceived(const aMessage: TvmRedisPubSubMessage);
 begin
   FMessageLock.Enter;
   try
@@ -202,7 +204,7 @@ end;
 
 {$REGION 'Test Publisher'}
 
-procedure TRedisPubSubTests.Test_Publisher_Connect;
+procedure TvmRedisPubSubTests.Test_Publisher_Connect;
 begin
   FPublisher.Connect;
   Assert.IsTrue(FPublisher.IsConnected, 'Publisher dovrebbe essere connesso');
@@ -210,7 +212,7 @@ begin
   Assert.IsFalse(FPublisher.IsConnected, 'Publisher dovrebbe essere disconnesso');
 end;
 
-procedure TRedisPubSubTests.Test_Publisher_Publish_NoSubscribers;
+procedure TvmRedisPubSubTests.Test_Publisher_Publish_NoSubscribers;
 var
   lCount: Integer;
 begin
@@ -222,7 +224,7 @@ begin
   FPublisher.Disconnect;
 end;
 
-procedure TRedisPubSubTests.Test_Publisher_Publish_WithSubscribers;
+procedure TvmRedisPubSubTests.Test_Publisher_Publish_WithSubscribers;
 var
   lCount: Integer;
   lTask: ITask;
@@ -267,7 +269,7 @@ begin
   FSubscriber.Disconnect;
 end;
 
-procedure TRedisPubSubTests.Test_Publisher_PubSubChannels;
+procedure TvmRedisPubSubTests.Test_Publisher_PubSubChannels;
 var
   lChannels: TArray<string>;
   lTask: ITask;
@@ -298,7 +300,7 @@ begin
   FSubscriber.Disconnect;
 end;
 
-procedure TRedisPubSubTests.Test_Publisher_PubSubNumSub;
+procedure TvmRedisPubSubTests.Test_Publisher_PubSubNumSub;
 var
   lNumSub: TDictionary<string, Integer>;
   lTask: ITask;
@@ -334,7 +336,7 @@ begin
   FSubscriber.Disconnect;
 end;
 
-procedure TRedisPubSubTests.Test_Publisher_PubSubNumPat;
+procedure TvmRedisPubSubTests.Test_Publisher_PubSubNumPat;
 var
   lNumPat: Integer;
   lTask: ITask;
@@ -367,7 +369,7 @@ end;
 
 {$REGION 'Test Subscriber'}
 
-procedure TRedisPubSubTests.Test_Subscriber_Connect;
+procedure TvmRedisPubSubTests.Test_Subscriber_Connect;
 begin
   FSubscriber.Connect;
   Assert.IsTrue(FSubscriber.IsConnected, 'Subscriber dovrebbe essere connesso');
@@ -375,7 +377,7 @@ begin
   Assert.IsFalse(FSubscriber.IsConnected, 'Subscriber dovrebbe essere disconnesso');
 end;
 
-procedure TRedisPubSubTests.Test_Subscriber_Subscribe_SingleChannel;
+procedure TvmRedisPubSubTests.Test_Subscriber_Subscribe_SingleChannel;
 var
   lTask: ITask;
 begin
@@ -412,7 +414,7 @@ begin
   FSubscriber.Disconnect;
 end;
 
-procedure TRedisPubSubTests.Test_Subscriber_Subscribe_MultipleChannels;
+procedure TvmRedisPubSubTests.Test_Subscriber_Subscribe_MultipleChannels;
 var
   lTask: ITask;
 begin
@@ -459,7 +461,7 @@ begin
   FSubscriber.Disconnect;
 end;
 
-procedure TRedisPubSubTests.Test_Subscriber_Unsubscribe;
+procedure TvmRedisPubSubTests.Test_Subscriber_Unsubscribe;
 var
   lTask: ITask;
 begin
@@ -493,7 +495,7 @@ begin
   FSubscriber.Disconnect;
 end;
 
-procedure TRedisPubSubTests.Test_Subscriber_PSubscribe_Pattern;
+procedure TvmRedisPubSubTests.Test_Subscriber_PSubscribe_Pattern;
 var
   lTask: ITask;
 begin
@@ -534,7 +536,7 @@ begin
   FSubscriber.Disconnect;
 end;
 
-procedure TRedisPubSubTests.Test_Subscriber_PUnsubscribe;
+procedure TvmRedisPubSubTests.Test_Subscriber_PUnsubscribe;
 var
   lTask: ITask;
 begin
@@ -569,7 +571,7 @@ end;
 
 {$REGION 'Test Messaging'}
 
-procedure TRedisPubSubTests.Test_Messaging_PublishReceive;
+procedure TvmRedisPubSubTests.Test_Messaging_PublishReceive;
 var
   lTask: ITask;
   lMessagePayload: string;
@@ -606,7 +608,7 @@ begin
   lTask.Wait;
 end;
 
-procedure TRedisPubSubTests.Test_Messaging_MultipleMessages;
+procedure TvmRedisPubSubTests.Test_Messaging_MultipleMessages;
 var
   lTask: ITask;
   I: Integer;
@@ -647,7 +649,7 @@ begin
   lTask.Wait;
 end;
 
-procedure TRedisPubSubTests.Test_Messaging_PatternMatching;
+procedure TvmRedisPubSubTests.Test_Messaging_PatternMatching;
 var
   lTask: ITask;
 begin
@@ -688,10 +690,10 @@ begin
   lTask.Wait;
 end;
 
-procedure TRedisPubSubTests.Test_Messaging_MultipleSubscribers;
+procedure TvmRedisPubSubTests.Test_Messaging_MultipleSubscribers;
 var
-  lSubscriber2: IRedisPubSubClient;
-  lMessages2: TList<TRedisPubSubMessage>;
+  lSubscriber2: IvmRedisPubSubClient;
+  lMessages2: TList<TvmRedisPubSubMessage>;
   lLock2: TCriticalSection;
   lTask1, lTask2: ITask;
   lChannel: string;
@@ -700,10 +702,10 @@ begin
   FPublisher.Connect;
   FSubscriber.Connect;
 
-  lSubscriber2 := TRedisPubSubClient.Create(FConfig);
+  lSubscriber2 := TvmRedisPubSubClient.Create(FConfig);
   lSubscriber2.Connect;
 
-  lMessages2 := TList<TRedisPubSubMessage>.Create;
+  lMessages2 := TList<TvmRedisPubSubMessage>.Create;
   lLock2 := TCriticalSection.Create;
   try
     lTask1 := TTask.Create(
@@ -719,7 +721,7 @@ begin
       procedure
       begin
         lSubscriber2.Subscribe([lChannel],
-          procedure(const AMsg: TRedisPubSubMessage)
+          procedure(const AMsg: TvmRedisPubSubMessage)
           begin
             if AMsg.MessageType = rmtMessage then
             begin
@@ -774,14 +776,14 @@ end;
 
 {$REGION 'Test Thread Listener'}
 
-procedure TRedisPubSubTests.Test_Listener_StartStop;
+procedure TvmRedisPubSubTests.Test_Listener_StartStop;
 var
-  lListenerThread: TRedisPubSubListenerThread;
+  lListenerThread: TvmRedisPubSubListenerThread;
 begin
   FSubscriber.Connect;
   FSubscriber.Subscribe(['test:listener'], OnMessageReceived);
 
-  lListenerThread := TRedisPubSubListenerThread.Create(FSubscriber);
+  lListenerThread := TvmRedisPubSubListenerThread.Create(FSubscriber);
   try
     lListenerThread.Start;
     Sleep(500);
@@ -799,16 +801,16 @@ begin
   FSubscriber.Disconnect;
 end;
 
-procedure TRedisPubSubTests.Test_Listener_ReceiveInBackground;
+procedure TvmRedisPubSubTests.Test_Listener_ReceiveInBackground;
 var
-  lListenerThread: TRedisPubSubListenerThread;
+  lListenerThread: TvmRedisPubSubListenerThread;
 begin
   FPublisher.Connect;
   FSubscriber.Connect;
 
   FSubscriber.Subscribe(['test:background'], OnMessageReceived);
 
-  lListenerThread := TRedisPubSubListenerThread.Create(FSubscriber);
+  lListenerThread := TvmRedisPubSubListenerThread.Create(FSubscriber);
   try
     lListenerThread.Start;
     Sleep(500);
@@ -836,14 +838,14 @@ end;
 
 {$ENDREGION}
 
-{$REGION 'Test Factory Methods su IRedisClient'}
+{$REGION 'Test Factory Methods su IvmRedisClient'}
 
-procedure TRedisPubSubTests.Test_Client_CreatePublisher;
+procedure TvmRedisPubSubTests.Test_Client_CreatePublisher;
 var
-  lClient: IRedisClient;
-  lPub: IRedisPubSubPublisher;
+  lClient: IvmRedisClient;
+  lPub: IvmRedisPubSubPublisher;
 begin
-  lClient := TRedisClient.New(FConfig);
+  lClient := TvmRedisClient.New(FConfig);
   lClient.Connect;
   try
     lPub := lClient.CreatePublisher;
@@ -857,12 +859,12 @@ begin
   end;
 end;
 
-procedure TRedisPubSubTests.Test_Client_CreateSubscriber;
+procedure TvmRedisPubSubTests.Test_Client_CreateSubscriber;
 var
-  lClient: IRedisClient;
-  lSub: IRedisPubSubClient;
+  lClient: IvmRedisClient;
+  lSub: IvmRedisPubSubClient;
 begin
-  lClient := TRedisClient.New(FConfig);
+  lClient := TvmRedisClient.New(FConfig);
   lClient.Connect;
   try
     lSub := lClient.CreateSubscriber;
@@ -876,12 +878,12 @@ begin
   end;
 end;
 
-procedure TRedisPubSubTests.Test_Client_Publish_DirectMethod;
+procedure TvmRedisPubSubTests.Test_Client_Publish_DirectMethod;
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
   lCount: Integer;
 begin
-  lClient := TRedisClient.New(FConfig);
+  lClient := TvmRedisClient.New(FConfig);
   lClient.Connect;
   try
     // Publish senza subscriber -> 0 destinatari
@@ -896,7 +898,7 @@ end;
 
 {$REGION 'Test Validazioni'}
 
-procedure TRedisPubSubTests.Test_Validation_EmptyChannel;
+procedure TvmRedisPubSubTests.Test_Validation_EmptyChannel;
 begin
   FPublisher.Connect;
 
@@ -905,12 +907,12 @@ begin
     begin
       FPublisher.Publish('', 'message');
     end,
-    ERedisValidationException,
+    EvmRedisValidationException,
     'Dovrebbe sollevare eccezione per canale vuoto'
   );
 end;
 
-procedure TRedisPubSubTests.Test_Validation_EmptyPattern;
+procedure TvmRedisPubSubTests.Test_Validation_EmptyPattern;
 begin
   FSubscriber.Connect;
 
@@ -921,7 +923,7 @@ begin
       SetLength(lEmpty, 0);
       FSubscriber.PSubscribe(lEmpty, OnMessageReceived);
     end,
-    ERedisValidationException,
+    EvmRedisValidationException,
     'Dovrebbe sollevare eccezione per pattern vuoto'
   );
 end;

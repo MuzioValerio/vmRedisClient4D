@@ -117,7 +117,7 @@
         <DCCReference Include="..\GrijjyFoundation\Grijjy.OpenSSL.API.pas"/>
         <DCCReference Include="..\GrijjyFoundation\Grijjy.OpenSSL.pas"/>
         <DCCReference Include="..\GrijjyFoundation\Grijjy.SocketPool.Win.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Grijjy.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Transport.Grijjy.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

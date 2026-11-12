@@ -1,6 +1,6 @@
 {-----------------------------------------------------------------------------
  Project: RedisClientTests
- Unit Name: Redis.Logger.Empty
+ Unit Name: vmRedis.Logger.Empty
  Copyright (C) 2026 Muzio Valerio
  Author:    muzio_dell
  Date:      26-mar-2026
@@ -20,17 +20,19 @@
  Info:
  Purpose:
  History:
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Logger.Empty;
+unit vmRedis.Logger.Empty;
 
 interface
 
 uses 
-  Redis.Types; 
+  vmRedis.Types; 
 
 type
-  TRedisEmptyLogger = class(TInterfacedObject, IRedisLogger)
+  TvmRedisEmptyLogger = class(TInterfacedObject, IvmRedisLogger)
   private
     procedure LogCommand(const aCommand: string);
     procedure LogResponse(const aResponse: string);
@@ -40,49 +42,49 @@ type
     procedure LogDebug(const aInfo: string);
     constructor Create(const aLogFile: string = ''); reintroduce;
   public
-    class function New(const aLogFile: string = ''): IRedisLogger;
+    class function New(const aLogFile: string = ''): IvmRedisLogger;
   end;
 
 implementation
 
-{ TRedisEmptyLogger }
+{ TvmRedisEmptyLogger }
 
-class function TRedisEmptyLogger.New(const aLogFile: string): IRedisLogger;
+class function TvmRedisEmptyLogger.New(const aLogFile: string): IvmRedisLogger;
 begin
-  Result := TRedisEmptyLogger.Create(aLogFile);
+  Result := TvmRedisEmptyLogger.Create(aLogFile);
 end;
 
-constructor TRedisEmptyLogger.Create(const aLogFile: string);
-begin
-  // do nothing
-end;
-
-procedure TRedisEmptyLogger.LogCommand(const aCommand: string);
+constructor TvmRedisEmptyLogger.Create(const aLogFile: string);
 begin
   // do nothing
 end;
 
-procedure TRedisEmptyLogger.LogDebug(const aInfo: string);
+procedure TvmRedisEmptyLogger.LogCommand(const aCommand: string);
 begin
   // do nothing
 end;
 
-procedure TRedisEmptyLogger.LogError(const aError: string);
+procedure TvmRedisEmptyLogger.LogDebug(const aInfo: string);
 begin
   // do nothing
 end;
 
-procedure TRedisEmptyLogger.LogInfo(const aInfo: string);
+procedure TvmRedisEmptyLogger.LogError(const aError: string);
 begin
   // do nothing
 end;
 
-procedure TRedisEmptyLogger.LogResponse(const aResponse: string);
+procedure TvmRedisEmptyLogger.LogInfo(const aInfo: string);
 begin
   // do nothing
 end;
 
-procedure TRedisEmptyLogger.LogWarning(const aWarning: string);
+procedure TvmRedisEmptyLogger.LogResponse(const aResponse: string);
+begin
+  // do nothing
+end;
+
+procedure TvmRedisEmptyLogger.LogWarning(const aWarning: string);
 begin
   // do nothing
 end;

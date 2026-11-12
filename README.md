@@ -3,7 +3,7 @@
 ![Delphi](https://img.shields.io/badge/Delphi-10.4+-red.svg)
 ![Redis](https://img.shields.io/badge/Redis-6.x%20|%207.x%20|%208.x-DC382D.svg)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)
-![Version](https://img.shields.io/badge/version-2.1-brightgreen.svg)
+![Version](https://img.shields.io/badge/version-3.0-brightgreen.svg)
 
 Native Redis client for Delphi with full support for the RESP protocol, connection pooling, Pipeline, Pub/Sub, Lua scripting and SSL/TLS. Built from scratch with no external dependencies, it provides a clean and intuitive interface for all Redis operations.
 
@@ -16,6 +16,7 @@ Native Redis client for Delphi with full support for the RESP protocol, connecti
 - [Features](#-features)
 - [Requirements](#-requirements)
 - [Installation](#-installation)
+- [Migrating from 2.1](#-migrating-from-21)
 - [Quick Start](#-quick-start)
 - [Transport Layer](#-transport-layer)
 - [Command Reference](#-command-reference)
@@ -48,9 +49,9 @@ Native Redis client for Delphi with full support for the RESP protocol, connecti
 - ✅ **Lua Scripting** — EVAL, EVALSHA, SCRIPT LOAD
 - ✅ **SSL/TLS** — Secure connections with certificate validation and mTLS
 - ✅ **Health Check** — Detailed monitoring with timestamp, ping time and transport status
-- ✅ **Logging** — Extensible system via `IRedisLogger` (Command/Response/Error/Warning/Info/Debug)
+- ✅ **Logging** — Extensible system via `IvmRedisLogger` (Command/Response/Error/Warning/Info/Debug)
 - ✅ **Generic command** — `ExecuteCommand` as an escape hatch for any Redis command
-- ✅ **Pluggable Transport Layer** — Unified `IRedisTransport`, Registry with auto-registration, Synapse and GrijjyFoundation support
+- ✅ **Pluggable Transport Layer** — Unified `IvmRedisTransport`, Registry with auto-registration, Synapse and GrijjyFoundation support
 
 ### Supported Commands by Type
 - **Strings** — SET, GET, MGET, MSET, MSETNX, GETSET, SETEX, PSETEX, SETNX, GETEX, GETEXPERSIST, GETDEL, APPEND, STRLEN, SETRANGE, GETRANGE, INCR, INCRBY, INCRBYFLOAT, DECR, DECRBY
@@ -122,11 +123,40 @@ The `packages` folder contains three runtime-only packages (the library has no d
    vmRedisClient4D\packages\$(Platform)\Release
    ```
    and `vmRedisClient4D\sources` to the **Browsing Path**, so the IDE can navigate to the sources.
-4. In your application, add the units to the `uses` clause as usual (for example `Redis.Client` and `Redis.Transport.Synapse`).
+4. In your application, add the units to the `uses` clause as usual (for example `vmRedis.Client` and `vmRedis.Transport.Synapse`).
 
 You can then link the library statically, which is the default and needs no extra files, or **with runtime packages**: in *Project > Options > Packages > Runtime Packages* enable *Link with runtime packages* and add `vmRedisClient4D` plus the transport packages you use. In that case distribute the corresponding `.bpl` files with your executable. The file name includes the compiler version (`{$LIBSUFFIX AUTO}`), for example `vmRedisClient4D370.bpl` with Delphi 13.
 
 > **Delphi Community Edition:** the packages are built from the IDE, as described above (CE has no command-line compiler).
+
+---
+
+## 🔄 Migrating from 2.1
+
+Version 3.0 renames units and types so the library can be used in the same project, and installed in the same IDE, as [`delphiredisclient`](https://github.com/danieleteti/delphiredisclient) by Daniele Teti, which DelphiMVCFramework uses. Both libraries had a `Redis.Client` unit and types such as `IRedisClient`, `TRedisClient` and `ERedisException`. The behaviour has not changed: only the names have.
+
+| What | 2.1 | 3.0 |
+|---|---|---|
+| Units | `Redis.Client`, `Redis.Pool`, `Redis.Transport.Synapse`, … | `vmRedis.Client`, `vmRedis.Pool`, `vmRedis.Transport.Synapse`, … |
+| Interfaces | `IRedisClient`, `IRedisResponse`, `IRedisConnectionPool`, … | `IvmRedisClient`, `IvmRedisResponse`, `IvmRedisConnectionPool`, … |
+| Classes and records | `TRedisClient`, `TRedisConnectionConfig`, `TRedisPoolConfig`, … | `TvmRedisClient`, `TvmRedisConnectionConfig`, `TvmRedisPoolConfig`, … |
+| Exceptions | `ERedisException`, `ERedisConnectionException`, … | `EvmRedisException`, `EvmRedisConnectionException`, … |
+| Other types | `TPooledRedisClient`, `TSimpleRedisLogger`, `TTransportActivator` | `TvmPooledRedisClient`, `TvmSimpleRedisLogger`, `TvmTransportActivator` |
+
+The rule is always the same:
+- in unit names, `Redis.` becomes `vmRedis.`;
+- in type names, `vm` goes after the first letter.
+
+Constants (`DEFAULT_*`, `RESP_*`), enum values (`rsoNX`, `raSum`, …), method names and the provider names (`'synapse'`, `'grijjy'`) are unchanged. No compatibility unit with the old names is provided.
+
+To update existing code, replace the unit names in the `uses` clauses and the type names in the code. For example, with two regular expressions:
+
+```
+\bRedis\.(Client|Connection|HealthCheck|Logger|Pool|Protocol|PubSub|Response|Transport|Types)\b   →  vmRedis.$1
+\b([IETR])Redis([A-Z]\w*)                                                                        →  $1vmRedis$2
+```
+
+The three types without `Redis` at the start (`TPooledRedisClient`, `TSimpleRedisLogger`, `TTransportActivator`) have to be renamed by hand.
 
 ---
 
@@ -136,16 +166,16 @@ You can then link the library statically, which is the default and needs no extr
 
 ```delphi
 uses
-  Redis.Client, Redis.Connection.Config, Redis.Types, Redis.Response,
-  Redis.Transport.Synapse;  // auto-registers the 'synapse' provider
+  vmRedis.Client, vmRedis.Connection.Config, vmRedis.Types, vmRedis.Response,
+  vmRedis.Transport.Synapse;  // auto-registers the 'synapse' provider
 
 var
-  lConfig: TRedisConnectionConfig;  // managed record: auto-initialized
-  lClient: IRedisClient;
+  lConfig: TvmRedisConnectionConfig;  // managed record: auto-initialized
+  lClient: IvmRedisClient;
 begin
-  lConfig := TRedisConnectionConfig.Localhost;  // host=localhost, port=6379
+  lConfig := TvmRedisConnectionConfig.Localhost;  // host=localhost, port=6379
 
-  lClient := TRedisClient.New(lConfig);         // 'synapse' provider by default
+  lClient := TvmRedisClient.New(lConfig);         // 'synapse' provider by default
   lClient.Connect;
   try
     if lClient.Ping then
@@ -163,14 +193,14 @@ end;
 
 ```delphi
 uses
-  Redis.Client, Redis.Connection.Config,
-  Redis.Transport.Grijjy;  // auto-registers the 'grijjy' provider
+  vmRedis.Client, vmRedis.Connection.Config,
+  vmRedis.Transport.Grijjy;  // auto-registers the 'grijjy' provider
 
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
 begin
-  lClient := TRedisClient.New(
-    TRedisConnectionConfig.Localhost,
+  lClient := TvmRedisClient.New(
+    TvmRedisConnectionConfig.Localhost,
     nil,        // optional logger
     'grijjy'   // explicit provider
   );
@@ -183,19 +213,19 @@ end;
 
 ```delphi
 // Redis 6+ with ACL
-lConfig := TRedisConnectionConfig.WithACL('localhost', 6379, 'myuser', 'mypassword', 0);
+lConfig := TvmRedisConnectionConfig.WithACL('localhost', 6379, 'myuser', 'mypassword', 0);
 
 // Redis < 6 — password only
-lConfig := TRedisConnectionConfig.WithAuth('localhost', 6379, 'mypassword', 0);
+lConfig := TvmRedisConnectionConfig.WithAuth('localhost', 6379, 'mypassword', 0);
 ```
 
 ### With Logger
 
 ```delphi
-uses Redis.HealthCheck;  // TSimpleRedisLogger
+uses vmRedis.HealthCheck;  // TvmSimpleRedisLogger
 
-lLogger := TSimpleRedisLogger.New;
-lClient := TRedisClient.New(lConfig, lLogger);
+lLogger := TvmSimpleRedisLogger.New;
+lClient := TvmRedisClient.New(lConfig, lLogger);
 ```
 
 ---
@@ -204,34 +234,34 @@ lClient := TRedisClient.New(lConfig, lLogger);
 
 ### Overview
 
-Since v2.1 the transport layer is fully decoupled from the Redis client. All implementations share a unified interface (`IRedisTransport`) and self-register in a global registry (`TRedisTransportRegistry`). The client has no knowledge of or dependency on the concrete transport.
+Since v2.1 the transport layer is fully decoupled from the Redis client. All implementations share a unified interface (`IvmRedisTransport`) and self-register in a global registry (`TvmRedisTransportRegistry`). The client has no knowledge of or dependency on the concrete transport.
 
 ```
-IRedisDataReader          ← raw data reading (used by TRedisProtocolParser)
-  └── IRedisTransport     ← unified interface for all transports
-        ├── TRedisNativeTransport   (Synapse, provider 'synapse')
-        └── TRedisGrijjyTransport   (GrijjyFoundation, provider 'grijjy')
+IvmRedisDataReader          ← raw data reading (used by TvmRedisProtocolParser)
+  └── IvmRedisTransport     ← unified interface for all transports
+        ├── TvmRedisNativeTransport   (Synapse, provider 'synapse')
+        └── TvmRedisGrijjyTransport   (GrijjyFoundation, provider 'grijjy')
 ```
 
-`IRedisSynapseTransport` is kept as a compatibility alias — existing code using it requires no changes.
+`IvmRedisSynapseTransport` is kept as a compatibility alias — existing code using it requires no changes.
 
 ---
 
-### `IRedisTransport` — Unified Interface
+### `IvmRedisTransport` — Unified Interface
 
-Defined in `Redis.Transport.Intf`, it replaces the former `IRedisSynapseTransport` (now an alias) and the old minimal `IRedisTransport`.
+Defined in `vmRedis.Transport.Intf`, it replaces the former `IvmRedisSynapseTransport` (now an alias) and the old minimal `IvmRedisTransport`.
 
 ```delphi
-// Redis.Transport.Intf.pas
+// vmRedis.Transport.Intf.pas
 
-// Raw data reading — used by TRedisProtocolParser
-IRedisDataReader = interface
+// Raw data reading — used by TvmRedisProtocolParser
+IvmRedisDataReader = interface
   function ReadLine: string;
   function ReadBytes(aCount: Integer): TBytes;
 end;
 
 // Unified interface for all Redis transports
-IRedisTransport = interface(IRedisDataReader)
+IvmRedisTransport = interface(IvmRedisDataReader)
   procedure Connect;
   procedure Disconnect;
   function  IsConnected: Boolean;
@@ -250,26 +280,26 @@ IRedisTransport = interface(IRedisDataReader)
 end;
 
 // Backward-compatibility alias
-IRedisSynapseTransport = IRedisTransport;
+IvmRedisSynapseTransport = IvmRedisTransport;
 ```
 
 ---
 
 ### Transport Registry
 
-`TRedisTransportRegistry` (in `Redis.Transport.Registry`) is the central point for registering and acquiring transports.
+`TvmRedisTransportRegistry` (in `vmRedis.Transport.Registry`) is the central point for registering and acquiring transports.
 
 ```delphi
 // Register a new provider (called in the unit's initialization section)
-TRedisTransportRegistry.RegisterProvider('myprovider',
-  function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport
+TvmRedisTransportRegistry.RegisterProvider('myprovider',
+  function(const aConfig: TvmRedisConnectionConfig; const aLogger: IvmRedisLogger): IvmRedisTransport
   begin
     Result := TMyTransport.New(aConfig, aLogger);
   end);
 
 // Acquire a transport by ID
-var lTransport := TRedisTransportRegistry.Acquire('synapse', lConfig, lLogger);
-var lTransport := TRedisTransportRegistry.Acquire('grijjy', lConfig, lLogger);
+var lTransport := TvmRedisTransportRegistry.Acquire('synapse', lConfig, lLogger);
+var lTransport := TvmRedisTransportRegistry.Acquire('grijjy', lConfig, lLogger);
 ```
 
 ID lookup is **case-insensitive**. If the provider is not registered, an exception is raised with an explicit message.
@@ -280,17 +310,17 @@ ID lookup is **case-insensitive**. If the provider is not registered, an excepti
 
 ### Synapse Provider (default)
 
-**Unit:** `Redis.Transport.Synapse`
+**Unit:** `vmRedis.Transport.Synapse`
 **Provider ID:** `'synapse'`
 **Platforms:** Windows 32/64-bit
 
-The original transport based on [Synapse](https://github.com/geby/synapse). It is the default when calling `TRedisClient.New` without specifying a provider.
+The original transport based on [Synapse](https://github.com/geby/synapse). It is the default when calling `TvmRedisClient.New` without specifying a provider.
 
 ```delphi
-uses Redis.Transport.Synapse;  // auto-registration on unit load
+uses vmRedis.Transport.Synapse;  // auto-registration on unit load
 
-lClient := TRedisClient.New(lConfig);                     // implicit 'synapse'
-lClient := TRedisClient.New(lConfig, nil, 'synapse');     // explicit
+lClient := TvmRedisClient.New(lConfig);                     // implicit 'synapse'
+lClient := TvmRedisClient.New(lConfig, nil, 'synapse');     // explicit
 ```
 
 Features:
@@ -302,16 +332,16 @@ Features:
 
 ### Grijjy Provider (cross-platform)
 
-**Unit:** `Redis.Transport.Grijjy`
+**Unit:** `vmRedis.Transport.Grijjy`
 **Provider ID:** `'grijjy'`
 **Platforms:** Windows, Linux, macOS, iOS, Android
 
 High-performance transport based on [GrijjyFoundation](https://github.com/grijjy/GrijjyFoundation). Uses event-based asynchronous I/O (`TgoClientSocketManager`) and native SSL/TLS with no additional OpenSSL dependencies.
 
 ```delphi
-uses Redis.Transport.Grijjy;  // auto-registration on unit load
+uses vmRedis.Transport.Grijjy;  // auto-registration on unit load
 
-lClient := TRedisClient.New(lConfig, nil, 'grijjy');
+lClient := TvmRedisClient.New(lConfig, nil, 'grijjy');
 lClient.Connect;
 ```
 
@@ -336,7 +366,7 @@ Grijjy.OpenSSL
 **SSL with Grijjy:**
 
 ```delphi
-lConfig := TRedisConnectionConfig.WithSSL(
+lConfig := TvmRedisConnectionConfig.WithSSL(
   'redis.example.com', 6380, 'user', 'pass', True
 );
 
@@ -344,7 +374,7 @@ lConfig := TRedisConnectionConfig.WithSSL(
 lConfig.ClientCertificatePath     := '/etc/certs/client.pem';
 lConfig.ClientCertificatePassword := 'certpass';
 
-lClient := TRedisClient.New(lConfig, nil, 'grijjy');
+lClient := TvmRedisClient.New(lConfig, nil, 'grijjy');
 lClient.Connect;
 ```
 
@@ -365,22 +395,22 @@ lClient.Connect;
 
 ### Implementing a Custom Transport
 
-To create a new transport, implement `IRedisTransport` and register it:
+To create a new transport, implement `IvmRedisTransport` and register it:
 
 ```delphi
-unit Redis.Transport.MyCustom;
+unit MyRedis.Transport.Custom;
 
 interface
 
 uses
-  Redis.Transport.Intf, Redis.Connection.Config, Redis.Types;
+  vmRedis.Transport.Intf, vmRedis.Connection.Config, vmRedis.Types;
 
 type
-  TMyCustomTransport = class(TInterfacedObject, IRedisTransport)
+  TMyCustomTransport = class(TInterfacedObject, IvmRedisTransport)
   private
     // ... private fields ...
   public
-    { IRedisTransport }
+    { IvmRedisTransport }
     procedure Connect;
     procedure Disconnect;
     function  IsConnected: Boolean;
@@ -389,23 +419,23 @@ type
     procedure PipelineCommand(const aParts: array of string);
     function  FlushPipeline: TBytes;
     function  IsPipelining: Boolean;
-    { IRedisDataReader }
+    { IvmRedisDataReader }
     function ReadLine: string;
     function ReadBytes(aCount: Integer): TBytes;
 
-    class function New(const aConfig: TRedisConnectionConfig;
-      aLogger: IRedisLogger): IRedisTransport;
+    class function New(const aConfig: TvmRedisConnectionConfig;
+      aLogger: IvmRedisLogger): IvmRedisTransport;
   end;
 
 implementation
 
-uses Redis.Transport.Registry;
+uses vmRedis.Transport.Registry;
 
 // ... implementation ...
 
 initialization
-  TRedisTransportRegistry.RegisterProvider('mycustom',
-    function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport
+  TvmRedisTransportRegistry.RegisterProvider('mycustom',
+    function(const aConfig: TvmRedisConnectionConfig; const aLogger: IvmRedisLogger): IvmRedisTransport
     begin
       Result := TMyCustomTransport.New(aConfig, aLogger);
     end);
@@ -413,7 +443,7 @@ initialization
 end.
 ```
 
-Then simply add the unit to your project and use `TRedisClient.New(lConfig, nil, 'mycustom')`.
+Then simply add the unit to your project and use `TvmRedisClient.New(lConfig, nil, 'mycustom')`.
 
 ---
 
@@ -443,7 +473,7 @@ lClient.RenameNX('old', 'new');
 lRnd  := lClient.RandomKey;
 lClient.Copy('src', 'dst', True);        // True = overwrite dst
 
-// TRedisScanResult.Cursor = 0 when iteration is complete
+// TvmRedisScanResult.Cursor = 0 when iteration is complete
 lScan := lClient.Scan(0, 'user:*', 100);
 ```
 
@@ -719,7 +749,7 @@ end;
 lSubscriber := lClient.CreateSubscriber;
 lSubscriber.Connect;
 lSubscriber.Subscribe(['news', 'alerts'],
-  procedure(const aMsg: TRedisPubSubMessage)
+  procedure(const aMsg: TvmRedisPubSubMessage)
   begin
     case aMsg.MessageType of
       rmtMessage:
@@ -737,7 +767,7 @@ lSubscriber.StartListening;  // blocking
 
 ```delphi
 lSubscriber.PSubscribe(['news:*'],
-  procedure(const aMsg: TRedisPubSubMessage)
+  procedure(const aMsg: TvmRedisPubSubMessage)
   begin
     case aMsg.MessageType of
       rmtPMessage:
@@ -747,7 +777,7 @@ lSubscriber.PSubscribe(['news:*'],
   end
 );
 
-lThread := TRedisPubSubListenerThread.Create(lSubscriber);
+lThread := TvmRedisPubSubListenerThread.Create(lSubscriber);
 lThread.Start;
 try
   ReadLn;  // application keeps running
@@ -763,26 +793,26 @@ end;
 
 ```delphi
 type
-  TRedisEventManager = class
+  TvmRedisEventManager = class
   private
-    FMainClient: IRedisClient;
-    FPublisher:  IRedisPubSubPublisher;
-    FSubscriber: IRedisPubSubClient;
-    FThread:     TRedisPubSubListenerThread;
+    FMainClient: IvmRedisClient;
+    FPublisher:  IvmRedisPubSubPublisher;
+    FSubscriber: IvmRedisPubSubClient;
+    FThread:     TvmRedisPubSubListenerThread;
   public
-    constructor Create(const aConfig: TRedisConnectionConfig;
-      aLogger: IRedisLogger = nil);
+    constructor Create(const aConfig: TvmRedisConnectionConfig;
+      aLogger: IvmRedisLogger = nil);
     destructor Destroy; override;
     procedure PublishEvent(const aType, aData: string);
-    procedure StartListening(aCallback: TRedisMessageCallback);
+    procedure StartListening(aCallback: TvmRedisMessageCallback);
     procedure StopListening;
   end;
 
-constructor TRedisEventManager.Create(const aConfig: TRedisConnectionConfig;
-  aLogger: IRedisLogger);
+constructor TvmRedisEventManager.Create(const aConfig: TvmRedisConnectionConfig;
+  aLogger: IvmRedisLogger);
 begin
   inherited Create;
-  FMainClient := TRedisClient.New(aConfig, aLogger);
+  FMainClient := TvmRedisClient.New(aConfig, aLogger);
   FMainClient.Connect;
   FPublisher  := FMainClient.CreatePublisher;
   FPublisher.Connect;
@@ -790,7 +820,7 @@ begin
   FSubscriber.Connect;
 end;
 
-destructor TRedisEventManager.Destroy;
+destructor TvmRedisEventManager.Destroy;
 begin
   StopListening;
   FPublisher.Disconnect;
@@ -799,15 +829,15 @@ begin
   inherited;
 end;
 
-procedure TRedisEventManager.StartListening(aCallback: TRedisMessageCallback);
+procedure TvmRedisEventManager.StartListening(aCallback: TvmRedisMessageCallback);
 begin
   FSubscriber.Subscribe(
     ['user.login', 'user.logout', 'system.error'], aCallback);
-  FThread := TRedisPubSubListenerThread.Create(FSubscriber);
+  FThread := TvmRedisPubSubListenerThread.Create(FSubscriber);
   FThread.Start;
 end;
 
-procedure TRedisEventManager.StopListening;
+procedure TvmRedisEventManager.StopListening;
 begin
   if Assigned(FSubscriber) and FSubscriber.IsListening then
   begin
@@ -879,7 +909,7 @@ end;
 ## 🔐 SSL/TLS
 
 ```delphi
-lConfig := TRedisConnectionConfig.WithSSL(
+lConfig := TvmRedisConnectionConfig.WithSSL(
   'redis.example.com', 6380, 'username', 'password', True
 );
 
@@ -888,10 +918,10 @@ lConfig.ClientCertificatePath     := 'C:\certs\client.pem';
 lConfig.ClientCertificatePassword := 'certpass';
 
 // With Synapse (Windows, OpenSSL DLL)
-lClient := TRedisClient.New(lConfig, nil, 'synapse');
+lClient := TvmRedisClient.New(lConfig, nil, 'synapse');
 
 // With Grijjy (cross-platform, native SSL)
-lClient := TRedisClient.New(lConfig, nil, 'grijjy');
+lClient := TvmRedisClient.New(lConfig, nil, 'grijjy');
 
 lClient.Connect;
 ```
@@ -913,22 +943,22 @@ Connection Pooling maintains a set of already-open Redis connections ready for u
 
 ### Internal Architecture
 
-The pool is managed by `TRedisConnectionPool` (implements `IRedisConnectionPool`). Internally it uses a `TObjectList<TPooledConnection>` protected by a `TCriticalSection`. Each `TPooledConnection` wraps an `IRedisClient` and tracks:
+The pool is managed by `TvmRedisConnectionPool` (implements `IvmRedisConnectionPool`). Internally it uses a `TObjectList<TvmPooledConnection>` protected by a `TCriticalSection`. Each `TvmPooledConnection` wraps an `IvmRedisClient` and tracks:
 
 - **IsHealthy** — checks that the connection responds correctly
 - **IdleTimeMs** — how long it has been idle
 - **ErrorCount** — consecutive errors (threshold 3 → automatic removal)
-- **CurrentDb** — currently selected database, read from `IRedisClient.CurrentDb` (for automatic `SELECT`)
+- **CurrentDb** — currently selected database, read from `IvmRedisClient.CurrentDb` (for automatic `SELECT`)
 
 ### Configuration
 
-`TRedisPoolConfig` is a managed record that auto-initializes with sensible defaults:
+`TvmRedisPoolConfig` is a managed record that auto-initializes with sensible defaults:
 
 ```delphi
-uses Redis.Pool;
+uses vmRedis.Pool;
 
 var
-  lPoolConfig:  TRedisPoolConfig;
+  lPoolConfig:  TvmRedisPoolConfig;
   // Automatic defaults:
   // MinConnections     = 2
   // MaxConnections     = 10
@@ -938,13 +968,13 @@ var
   // EnableHealthCheck  = True
   // ResetOnRelease     = False
 
-  lPool: IRedisConnectionPool;
+  lPool: IvmRedisConnectionPool;
 begin
   lPoolConfig.MinConnections := 2;
   lPoolConfig.MaxConnections := 10;
   lPoolConfig.AcquireTimeout := 5000;
 
-  lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig);
+  lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig);
   lPool.Initialize;
   try
     // ... use the pool
@@ -956,12 +986,12 @@ end;
 
 ### Pattern 1 — Helper (recommended)
 
-`TRedisPoolHelper` automatically handles acquire, execution, and release — even on exception.
+`TvmRedisPoolHelper` automatically handles acquire, execution, and release — even on exception.
 
 ```delphi
 // Procedure
-TRedisPoolHelper.Execute(lPool,
-  procedure(aClient: IRedisClient)
+TvmRedisPoolHelper.Execute(lPool,
+  procedure(aClient: IvmRedisClient)
   begin
     aClient.SetValue('last_access', DateTimeToStr(Now));
     aClient.Incr('request_count');
@@ -969,8 +999,8 @@ TRedisPoolHelper.Execute(lPool,
 );
 
 // Typed return value
-var lName := TRedisPoolHelper.Execute<string>(lPool,
-  function(aClient: IRedisClient): string
+var lName := TvmRedisPoolHelper.Execute<string>(lPool,
+  function(aClient: IvmRedisClient): string
   begin
     Result := aClient.Get('user:1:name').AsString;
   end
@@ -991,14 +1021,14 @@ end;
 
 ### Pattern 3 — Managed Record (auto-release)
 
-`TPooledRedisClient` is a managed record: its automatic Finalize calls Release at the end of the scope.
+`TvmPooledRedisClient` is a managed record: its automatic Finalize calls Release at the end of the scope.
 
 ```delphi
 procedure DoSomething;
 var
-  lPooled: TPooledRedisClient;
+  lPooled: TvmPooledRedisClient;
 begin
-  lPooled := TPooledRedisClient.Create(lPool);
+  lPooled := TvmPooledRedisClient.Create(lPool);
   lPooled.Client.Incr('counter');
   lPooled.Client.SetValue('status', 'active');
 end;  // ← Finalize automatically calls Release
@@ -1075,8 +1105,8 @@ begin
     procedure
     begin
       for var J := 1 to 10 do
-        TRedisPoolHelper.Execute(lPool,
-          procedure(aClient: IRedisClient)
+        TvmRedisPoolHelper.Execute(lPool,
+          procedure(aClient: IvmRedisClient)
           begin
             aClient.Incr(Format('thread:%d:counter', [lNum]));
             Sleep(Random(100));
@@ -1094,7 +1124,7 @@ lPool.LogStats;
 
 ```delphi
 // Built-in helper for multi-thread stress tests
-TRedisThreadHelper.WorkerThread(lPool, ThreadNum, Iterations);
+TvmRedisThreadHelper.WorkerThread(lPool, ThreadNum, Iterations);
 ```
 
 ### Production Checklist
@@ -1102,7 +1132,7 @@ TRedisThreadHelper.WorkerThread(lPool, ThreadNum, Iterations);
 - ✅ Call `Pool.Initialize` at application startup
 - ✅ Call `Pool.Shutdown` at shutdown to free all resources
 - ✅ Size `MaxConnections` based on the number of concurrent threads/requests
-- ✅ Use `IRedisLogger` to trace automatic removal of non-healthy connections
+- ✅ Use `IvmRedisLogger` to trace automatic removal of non-healthy connections
 - ✅ Monitor `WaitingRequests` and `AverageAcquireTimeMs` in production
 - ✅ Use `AcquireConnectionOnDb` instead of manual `Select`
 - ✅ Close every `Multi` with `Exec` or `Discard` before releasing: otherwise the pool destroys the connection
@@ -1116,12 +1146,12 @@ TRedisThreadHelper.WorkerThread(lPool, ThreadNum, Iterations);
 ```delphi
 function GetUserData(aUserId: Integer): string;
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
   lKey:    string;
-  lCached: IRedisResponse;
+  lCached: IvmRedisResponse;
 begin
   lKey    := Format('user:%d', [aUserId]);
-  lClient := TRedisClient.New(FConfig);
+  lClient := TvmRedisClient.New(FConfig);
   lClient.Connect;
   try
     lCached := lClient.Get(lKey);
@@ -1144,12 +1174,12 @@ const
   MAX_REQUESTS   = 100;
   WINDOW_SECONDS = 3600;
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
   lKey:    string;
   lCount:  Int64;
 begin
   lKey    := Format('ratelimit:%s:%s', [aUserId, aAction]);
-  lClient := TRedisClient.New(FConfig);
+  lClient := TvmRedisClient.New(FConfig);
   lClient.Connect;
   try
     lCount := lClient.Incr(lKey);
@@ -1167,11 +1197,11 @@ end;
 ```delphi
 function AcquireLock(const aResource: string; aTimeoutSec: Integer): string;
 var
-  lClient: IRedisClient;
+  lClient: IvmRedisClient;
   lToken:  string;
 begin
   lToken  := TGuid.NewGuid.ToString;
-  lClient := TRedisClient.New(FConfig);
+  lClient := TvmRedisClient.New(FConfig);
   lClient.Connect;
   try
     if lClient.SetNX('lock:' + aResource, lToken) then
@@ -1212,20 +1242,20 @@ lRank := lClient.ZRevRank(BOARD, aPlayer);
 ```
 vmRedisClient4D/
 ├── sources/
-│   ├── Redis.Client.Intf.pas            # IRedisClient interface
-│   ├── Redis.Client.pas                 # TRedisClient implementation
-│   ├── Redis.Connection.Config.pas      # TRedisConnectionConfig (managed record)
-│   ├── Redis.Protocol.pas               # RESP parser + serializer
-│   ├── Redis.Response.pas               # IRedisResponse / TRedisResponse
-│   ├── Redis.Transport.Intf.pas         # IRedisTransport / IRedisDataReader (NEW v2.1)
-│   ├── Redis.Transport.Registry.pas     # TRedisTransportRegistry (NEW v2.1)
-│   ├── Redis.Transport.Synapse.pas      # Synapse transport (Windows)
-│   ├── Redis.Transport.Grijjy.pas       # GrijjyFoundation transport (cross-platform, NEW v2.1)
-│   ├── Redis.Logger.Empty.pas           # TRedisEmptyLogger (no-op logger)
-│   ├── Redis.Types.pas                  # Types, exceptions, TRedisScanResult
-│   ├── Redis.Pool.pas                   # Pool + helper + statistics
-│   ├── Redis.PubSub.pas                 # Publisher, Subscriber, ListenerThread
-│   └── Redis.HealthCheck.pas            # TSimpleRedisLogger
+│   ├── vmRedis.Client.Intf.pas            # IvmRedisClient interface
+│   ├── vmRedis.Client.pas                 # TvmRedisClient implementation
+│   ├── vmRedis.Connection.Config.pas      # TvmRedisConnectionConfig (managed record)
+│   ├── vmRedis.Protocol.pas               # RESP parser + serializer
+│   ├── vmRedis.Response.pas               # IvmRedisResponse / TvmRedisResponse
+│   ├── vmRedis.Transport.Intf.pas         # IvmRedisTransport / IvmRedisDataReader (NEW v2.1)
+│   ├── vmRedis.Transport.Registry.pas     # TvmRedisTransportRegistry (NEW v2.1)
+│   ├── vmRedis.Transport.Synapse.pas      # Synapse transport (Windows)
+│   ├── vmRedis.Transport.Grijjy.pas       # GrijjyFoundation transport (cross-platform, NEW v2.1)
+│   ├── vmRedis.Logger.Empty.pas           # TvmRedisEmptyLogger (no-op logger)
+│   ├── vmRedis.Types.pas                  # Types, exceptions, TvmRedisScanResult
+│   ├── vmRedis.Pool.pas                   # Pool + helper + statistics
+│   ├── vmRedis.PubSub.pas                 # Publisher, Subscriber, ListenerThread
+│   └── vmRedis.HealthCheck.pas            # TvmSimpleRedisLogger
 ├── packages/                          # runtime packages + vmRedisClient4D.groupproj
 ├── synapse/
 ├── GrijjyFoundation/
@@ -1235,30 +1265,30 @@ vmRedisClient4D/
 │   ├── ExamplePubSub.dpr                # 3 Pub/Sub patterns + Event Manager
 │   └── ExampleHealthCheck.dpr
 └── unit_test/
-    ├── Redis.Client.Tests.pas
-    ├── Redis.Pool.Tests.pas
-    └── Redis.PubSub.Tests.pas
+    ├── vmRedis.Client.Tests.pas
+    ├── vmRedis.Pool.Tests.pas
+    └── vmRedis.PubSub.Tests.pas
 ```
 
 ### Design Patterns
 
 - **Interface-Based Design** — Automatic memory management, zero memory leaks
-- **Factory Pattern** — `TRedisClient.New`, `TRedisConnectionConfig.Localhost/WithACL/WithSSL`, `TRedisConnectionPool.New`
-- **Observer Pattern** — Pub/Sub with `TRedisMessageCallback`
-- **Object Pool Pattern** — `TRedisConnectionPool` + `TPooledConnection` + statistics
-- **Strategy Pattern** — Replaceable logger via `IRedisLogger`; swappable transport via `IRedisTransport` + Registry
-- **Registry Pattern** — `TRedisTransportRegistry` with auto-registration via `initialization`
-- **Managed Record** — `TRedisConnectionConfig`, `TRedisPoolConfig`, `TPooledRedisClient`
+- **Factory Pattern** — `TvmRedisClient.New`, `TvmRedisConnectionConfig.Localhost/WithACL/WithSSL`, `TvmRedisConnectionPool.New`
+- **Observer Pattern** — Pub/Sub with `TvmRedisMessageCallback`
+- **Object Pool Pattern** — `TvmRedisConnectionPool` + `TvmPooledConnection` + statistics
+- **Strategy Pattern** — Replaceable logger via `IvmRedisLogger`; swappable transport via `IvmRedisTransport` + Registry
+- **Registry Pattern** — `TvmRedisTransportRegistry` with auto-registration via `initialization`
+- **Managed Record** — `TvmRedisConnectionConfig`, `TvmRedisPoolConfig`, `TvmPooledRedisClient`
 
 ### Thread Safety
 
-- ✅ `IRedisConnectionPool` — fully thread-safe (`TCriticalSection`)
-- ✅ Each `TPooledConnection` — dedicated lock for concurrent acquisitions
+- ✅ `IvmRedisConnectionPool` — fully thread-safe (`TCriticalSection`)
+- ✅ Each `TvmPooledConnection` — dedicated lock for concurrent acquisitions
 - ✅ Publisher and Subscriber — dedicated, isolated TCP connections
-- ✅ `TRedisPubSubListenerThread` — background listening without blocking the app
+- ✅ `TvmRedisPubSubListenerThread` — background listening without blocking the app
 - ✅ `AcquireConnectionOnDb` — safe SELECT for every thread
-- ✅ `TRedisGrijjyTransport` — receive buffer protected by `TCriticalSection` + `TEvent`
-- ⚠️ Base `IRedisClient` — **NOT** thread-safe: use the pool in multi-threaded applications
+- ✅ `TvmRedisGrijjyTransport` — receive buffer protected by `TCriticalSection` + `TEvent`
+- ⚠️ Base `IvmRedisClient` — **NOT** thread-safe: use the pool in multi-threaded applications
 
 ---
 
@@ -1269,21 +1299,21 @@ try
   lClient.Connect;
   lClient.SetValue('test', 'value');
 except
-  on E: ERedisTimeoutException do        // TCP/read timeout
+  on E: EvmRedisTimeoutException do        // TCP/read timeout
     WriteLn('Timeout: ' + E.Message);
-  on E: ERedisConnectionException do     // TCP/SSL connection error
+  on E: EvmRedisConnectionException do     // TCP/SSL connection error
     WriteLn('Connection: ' + E.Message);
-  on E: ERedisProtocolException do       // malformed RESP response
+  on E: EvmRedisProtocolException do       // malformed RESP response
     WriteLn('Protocol: ' + E.Message);
-  on E: ERedisCommandException do        // Redis error (-ERR ...)
+  on E: EvmRedisCommandException do        // Redis error (-ERR ...)
     WriteLn('Command: ' + E.Message);
-  on E: ERedisPipelineException do       // error in pipeline mode
+  on E: EvmRedisPipelineException do       // error in pipeline mode
     WriteLn('Pipeline: ' + E.Message);
-  on E: ERedisValidationException do     // invalid parameter on client side
+  on E: EvmRedisValidationException do     // invalid parameter on client side
     WriteLn('Validation: ' + E.Message);
-  on E: ERedisConfigException do         // invalid configuration
+  on E: EvmRedisConfigException do         // invalid configuration
     WriteLn('Config: ' + E.Message);
-  on E: ERedisException do               // catch-all
+  on E: EvmRedisException do               // catch-all
     WriteLn('Redis: ' + E.Message);
 end;
 ```
@@ -1292,10 +1322,10 @@ end;
 
 ## ⚙️ Advanced Configuration
 
-`TRedisConnectionConfig` auto-initializes with safe values as soon as it is declared.
+`TvmRedisConnectionConfig` auto-initializes with safe values as soon as it is declared.
 
 ```delphi
-var lConfig: TRedisConnectionConfig;
+var lConfig: TvmRedisConnectionConfig;
 // Already ready: host=localhost, port=6379, timeout=5000ms, maxRetries=3...
 
 lConfig.Host                      := 'redis.example.com';
@@ -1318,7 +1348,7 @@ lConfig.ClientName                := 'my-app';
 lConfig.ClusterMode               := True;
 lConfig.ClusterNodes              := 'node1:6379,node2:6379';
 
-lConfig.Validate;  // raises ERedisConfigException if something is wrong
+lConfig.Validate;  // raises EvmRedisConfigException if something is wrong
 
 WriteLn(lConfig.ToConnectionString);
 // → redis.example.com:6379, user=admin, password=***, db=2, ssl=true, name=my-app
@@ -1330,14 +1360,14 @@ WriteLn(lConfig.ToConnectionString);
 
 ### Connections
 - Use **connection pooling** for any application with concurrent requests
-- Always close with **Disconnect** in `finally`, or use `TPooledRedisClient`
+- Always close with **Disconnect** in `finally`, or use `TvmPooledRedisClient`
 - Use **`AcquireConnectionOnDb`** instead of manual `Select` on pooled connections
 
 ### Transport
 - Use **Synapse** for Windows-only applications: it is the default and requires no extra setup
 - Use **Grijjy** for cross-platform applications or when native SSL without external DLLs is required
 - Add **only the transport unit you need** to the project: registration is automatic
-- `IRedisSynapseTransport` is treated as an alias for `IRedisTransport` — existing code works without changes
+- `IvmRedisSynapseTransport` is treated as an alias for `IvmRedisTransport` — existing code works without changes
 
 ### Performance
 - Use **Pipeline** for batch operations: N round-trips → 1
@@ -1353,8 +1383,8 @@ WriteLn(lConfig.ToConnectionString);
 - Call **`Validate`** before `Connect`
 
 ### Logging
-- Implement **`IRedisLogger`** with a dedicated system (file, syslog, OpenTelemetry)
-- `TSimpleRedisLogger` is for development and testing only
+- Implement **`IvmRedisLogger`** with a dedicated system (file, syslog, OpenTelemetry)
+- `TvmSimpleRedisLogger` is for development and testing only
 - **Passwords are masked** automatically in logs
 
 ---
@@ -1371,20 +1401,23 @@ WriteLn(lConfig.ToConnectionString);
 - [x] **HyperLogLog** — PFADD, PFCOUNT, PFMERGE
 - [x] Server/Admin: DBSIZE, FLUSHDB, INFO, SELECT, CONFIG GET/SET, CLIENT SETNAME/GETNAME
 - [x] Connection Pool with `AcquireConnectionOnDb` and automatic SELECT fix
-- [x] `TPooledRedisClient` — managed record with auto-release
-- [x] `TRedisThreadHelper` — helper for multi-thread load testing
-- [x] `TRedisScanResult` — cursor + items for SCAN/SSCAN/HSCAN/ZSCAN
-- [x] Typed exception hierarchy: ERedisTimeout, ERedisPipeline, etc.
-- [x] `TRedisPoolStats` with detailed metrics
+- [x] `TvmPooledRedisClient` — managed record with auto-release
+- [x] `TvmRedisThreadHelper` — helper for multi-thread load testing
+- [x] `TvmRedisScanResult` — cursor + items for SCAN/SSCAN/HSCAN/ZSCAN
+- [x] Typed exception hierarchy: EvmRedisTimeout, EvmRedisPipeline, etc.
+- [x] `TvmRedisPoolStats` with detailed metrics
 - [x] SSL/TLS with mTLS
 
 ### Completed in v2.1 ✅
-- [x] **Unified `IRedisTransport`** — replaces `IRedisSynapseTransport` (alias kept for backward compatibility)
-- [x] **`TRedisTransportRegistry`** — global registry with auto-registration via `initialization`
-- [x] **Grijjy transport** — `TRedisGrijjyTransport` cross-platform with async I/O and native SSL
-- [x] `TRedisClient.New` with optional `aProvider` parameter (`'synapse'` default, `'grijjy'` available)
+- [x] **Unified `IvmRedisTransport`** — replaces `IvmRedisSynapseTransport` (alias kept for backward compatibility)
+- [x] **`TvmRedisTransportRegistry`** — global registry with auto-registration via `initialization`
+- [x] **Grijjy transport** — `TvmRedisGrijjyTransport` cross-platform with async I/O and native SSL
+- [x] `TvmRedisClient.New` with optional `aProvider` parameter (`'synapse'` default, `'grijjy'` available)
 - [x] Linux/macOS/iOS/Android support via the Grijjy provider
-- [x] Session state on `IRedisClient` (`IsInTransaction`, `IsWatching`, `IsPipelineActive`, `CurrentDb`); the pool no longer reuses connections left with `MULTI`/`WATCH` open, and offers `ResetOnRelease`
+- [x] Session state on `IvmRedisClient` (`IsInTransaction`, `IsWatching`, `IsPipelineActive`, `CurrentDb`); the pool no longer reuses connections left with `MULTI`/`WATCH` open, and offers `ResetOnRelease`
+
+### v3.0 (in progress)
+- [x] **Renamed units and types** — `vmRedis.` prefix on units and `vm` on public types, to coexist with `delphiredisclient` (see [Migrating from 2.1](#-migrating-from-21))
 
 ### Planned
 - [ ] Redis Streams (XADD, XREAD, XGROUP, XACK)
@@ -1408,10 +1441,10 @@ WriteLn(lConfig.ToConnectionString);
 ### Guidelines
 - Naming: `l` prefix for local variables, `F` for private fields, `a` for parameters
 - Add unit tests for every new feature
-- Update documentation for changes to the public API of `IRedisClient`
+- Update documentation for changes to the public API of `IvmRedisClient`
 - Test on Delphi 10.4+ and on Redis 7.x and 8.x
-- Maintain backward compatibility of `IRedisClient`
-- For new transports: implement `IRedisTransport`, auto-register in the `initialization` section
+- Maintain backward compatibility of `IvmRedisClient`
+- For new transports: implement `IvmRedisTransport`, auto-register in the `initialization` section
 
 ---
 

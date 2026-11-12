@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Pool
+ Unit Name: vmRedis.Pool
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    VMuzio
  Date:      14-dic-2025
@@ -24,7 +24,7 @@
  - Updated:   2026 - Fix SELECT database nelle connessioni pooled
 
  - Cambiamento principale:
-    TPooledConnection ora traccia il database corrente.
+    TvmPooledConnection ora traccia il database corrente.
     AcquireConnection verifica che la connessione sia sul db corretto
     e, se necessario, invia SELECT prima di restituirla al chiamante.
     Questo evita che connessioni rilasciate dopo un SELECT rimangano
@@ -34,36 +34,38 @@
 
  - Cambiamenti principali:
     Il database corrente non è più tracciato nel pool ma nel client
-    (IRedisClient.CurrentDb), così anche un Select fatto dal chiamante
+    (IvmRedisClient.CurrentDb), così anche un Select fatto dal chiamante
     viene visto da EnsureDatabase (#3).
     ReleaseConnection distrugge la connessione se MULTI, WATCH o una
     pipeline sono rimasti aperti (#3).
-    Nuova opzione TRedisPoolConfig.ResetOnRelease: RESET a ogni rilascio
+    Nuova opzione TvmRedisPoolConfig.ResetOnRelease: RESET a ogni rilascio
     (Redis 6.2+), con ripristino di AUTH e CLIENT SETNAME (#3).
-    TRedisConnectionPool.New passa il transport richiesto (#1).
+    TvmRedisConnectionPool.New passa il transport richiesto (#1).
     CleanupIdleConnections: risolto use-after-free e conteggio del
     minimo di connessioni (#2).
     InternalAcquire: se EnsureDatabase fallisce la connessione viene
     distrutta invece di restare InUse per sempre (#6).
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Pool;
+unit vmRedis.Pool;
 
 interface
 
 uses
   System.SysUtils, System.Classes, System.Generics.Collections,
   System.SyncObjs, System.DateUtils,
-  Redis.Types,
-  Redis.Client.Intf,
-  Redis.Client,
-  Redis.Connection.Config;
+  vmRedis.Types,
+  vmRedis.Client.Intf,
+  vmRedis.Client,
+  vmRedis.Connection.Config;
 
 type
   // ============================================================================
   // Configurazione pool
   // ============================================================================
-  TRedisPoolConfig = record
+  TvmRedisPoolConfig = record
     MinConnections: Integer;      // Minimo connessioni da mantenere
     MaxConnections: Integer;      // Massimo connessioni consentite
     AcquireTimeout: Integer;      // Timeout per ottenere una connessione (ms)
@@ -72,16 +74,16 @@ type
     EnableHealthCheck: Boolean;   // Abilita controlli di salute
     ResetOnRelease: Boolean;      // RESET a ogni rilascio (Redis 6.2+), +1 round trip.
 
-    class operator Initialize(out Dest: TRedisPoolConfig);
-    class operator Finalize(var Dest: TRedisPoolConfig);
-    class operator Assign(var Dest: TRedisPoolConfig; const [ref] Src: TRedisPoolConfig);
+    class operator Initialize(out Dest: TvmRedisPoolConfig);
+    class operator Finalize(var Dest: TvmRedisPoolConfig);
+    class operator Assign(var Dest: TvmRedisPoolConfig; const [ref] Src: TvmRedisPoolConfig);
 
     procedure Validate;
   end;
 
   // Statistiche del pool
   
-  TRedisPoolStats = record
+  TvmRedisPoolStats = record
     TotalConnections: Integer;     // Totale connessioni nel pool
     ActiveConnections: Integer;    // Connessioni in uso
     IdleConnections: Integer;      // Connessioni disponibili
@@ -97,16 +99,16 @@ type
   end;
 
   // Forward declaration
-  TRedisConnectionPool = class;
+  TvmRedisConnectionPool = class;
 
   // ============================================================================
-  // Connessione pooled - wrappa un IRedisClient con metadati
+  // Connessione pooled - wrappa un IvmRedisClient con metadati
   // ============================================================================
-  TPooledConnection = class(TObject)
+  TvmPooledConnection = class(TObject)
   private
-    FClient: IRedisClient;
-    FRedisConfig: TRedisConnectionConfig;
-    FPool: TRedisConnectionPool;
+    FClient: IvmRedisClient;
+    FRedisConfig: TvmRedisConnectionConfig;
+    FPool: TvmRedisConnectionPool;
     FCreatedAt: TDateTime;
     FLastUsedAt: TDateTime;
     FInUse: Boolean;
@@ -117,7 +119,7 @@ type
     function GetIdleTimeMs: Int64;
     function GetCurrentDb: Integer;
   public
-    constructor Create(aPool: TRedisConnectionPool; const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger; aTransport: string = 'synapse');
+    constructor Create(aPool: TvmRedisConnectionPool; const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger; aTransport: string = 'synapse');
         reintroduce;
     destructor Destroy; override;
 
@@ -131,7 +133,7 @@ type
     procedure EnsureDatabase(aDb: Integer);
     function ResetState: Boolean;
 
-    property Client: IRedisClient read FClient;
+    property Client: IvmRedisClient read FClient;
     property InUse: Boolean read FInUse;
     property IsHealthy: Boolean read GetIsHealthy;
     property IdleTimeMs: Int64 read GetIdleTimeMs;
@@ -145,63 +147,63 @@ type
   // ============================================================================
   // Interfaccia pool
   // ============================================================================
-  IRedisConnectionPool = interface
+  IvmRedisConnectionPool = interface
   ['{F1E2D3C4-B5A6-9786-5432-1098FEDCBA76}']
     procedure Initialize;
     procedure Shutdown;
 
-    function  AcquireConnection: IRedisClient;
+    function  AcquireConnection: IvmRedisClient;
     /// AcquireConnectionOnDb: acquisisce una connessione già posizionata sul db specificato
-    function  AcquireConnectionOnDb(aDb: Integer): IRedisClient;
-    procedure ReleaseConnection(aClient: IRedisClient);
+    function  AcquireConnectionOnDb(aDb: Integer): IvmRedisClient;
+    procedure ReleaseConnection(aClient: IvmRedisClient);
 
-    function  GetStats: TRedisPoolStats;
+    function  GetStats: TvmRedisPoolStats;
     procedure LogStats;
-    function  GetConfig: TRedisPoolConfig;
+    function  GetConfig: TvmRedisPoolConfig;
   end;
 
   // ============================================================================
   // Implementazione pool
   // ============================================================================
-  TRedisConnectionPool = class(TInterfacedObject, IRedisConnectionPool)
+  TvmRedisConnectionPool = class(TInterfacedObject, IvmRedisConnectionPool)
   strict private
-    FConfig: TRedisPoolConfig;
-    FRedisConfig: TRedisConnectionConfig;
-    FLogger: IRedisLogger;
-    FConnections: TObjectList<TPooledConnection>;
+    FConfig: TvmRedisPoolConfig;
+    FRedisConfig: TvmRedisConnectionConfig;
+    FLogger: IvmRedisLogger;
+    FConnections: TObjectList<TvmPooledConnection>;
     FLock: TCriticalSection;
     FWaitingRequests: Integer;
-    FStats: TRedisPoolStats;
+    FStats: TvmRedisPoolStats;
     FInitialized: Boolean;
     FShutdown: Boolean;
     FTransport: string;
 
-    function CreateConnection: TPooledConnection;
-    procedure DestroyConnection(aConnection: TPooledConnection);
-    function FindIdleConnection: TPooledConnection;
+    function CreateConnection: TvmPooledConnection;
+    procedure DestroyConnection(aConnection: TvmPooledConnection);
+    function FindIdleConnection: TvmPooledConnection;
     function CanCreateNewConnection: Boolean;
     procedure EnsureMinConnections;
     procedure CleanupIdleConnections;
     procedure ValidateConnections;
     procedure UpdateAcquireTime(aTimeMs: Int64);
     // Acquisisce internamente, opzionalmente riposizionando il db
-    function InternalAcquire(aDb: Integer = -1): IRedisClient;
+    function InternalAcquire(aDb: Integer = -1): IvmRedisClient;
   private
     procedure Initialize;
     procedure Shutdown;
-    function AcquireConnection: IRedisClient;
-    function AcquireConnectionOnDb(aDb: Integer): IRedisClient;
-    procedure ReleaseConnection(aClient: IRedisClient);
-    function GetStats: TRedisPoolStats;
+    function AcquireConnection: IvmRedisClient;
+    function AcquireConnectionOnDb(aDb: Integer): IvmRedisClient;
+    procedure ReleaseConnection(aClient: IvmRedisClient);
+    function GetStats: TvmRedisPoolStats;
     procedure LogStats;
-    function GetConfig: TRedisPoolConfig;
+    function GetConfig: TvmRedisPoolConfig;
 
-    constructor Create(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; aTransport: string =
+    constructor Create(const aPoolConfig: TvmRedisPoolConfig; const aRedisConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil; aTransport: string =
         'synapse'); reintroduce;
   public
     destructor Destroy; override;
-    class function New(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; aTransport: string =
-        'synapse'): IRedisConnectionPool;
+    class function New(const aPoolConfig: TvmRedisPoolConfig; const aRedisConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil; aTransport: string =
+        'synapse'): IvmRedisConnectionPool;
   end;
 
   // ============================================================================
@@ -209,35 +211,35 @@ type
   // ============================================================================
 
   // Helper per eseguire operazioni con gestione automatica acquire/release
-  TRedisPoolHelper = class(TObject)
+  TvmRedisPoolHelper = class(TObject)
   public
     // Esegue una funzione con una connessione dal pool
-    class function Execute<T>(aPool: IRedisConnectionPool; aFunc: TFunc<IRedisClient, T>): T; overload;
+    class function Execute<T>(aPool: IvmRedisConnectionPool; aFunc: TFunc<IvmRedisClient, T>): T; overload;
 
     // Esegue una procedura con una connessione dal pool
-    class procedure Execute(aPool: IRedisConnectionPool; aProc: TProc<IRedisClient>); overload;
+    class procedure Execute(aPool: IvmRedisConnectionPool; aProc: TProc<IvmRedisClient>); overload;
   end;
 
   // Classe per gestione pooled connection con try-finally automatico
-  TPooledRedisClient = record
-    Pool: IRedisConnectionPool;
-    Client: IRedisClient;
+  TvmPooledRedisClient = record
+    Pool: IvmRedisConnectionPool;
+    Client: IvmRedisClient;
     Acquired: Boolean;
 
-    constructor Create(aPool: IRedisConnectionPool);
+    constructor Create(aPool: IvmRedisConnectionPool);
     procedure Release;
-    class operator Initialize(out Dest: TPooledRedisClient);
-    class operator Finalize(var Dest: TPooledRedisClient);
+    class operator Initialize(out Dest: TvmPooledRedisClient);
+    class operator Finalize(var Dest: TvmPooledRedisClient);
   end;
 
   // ============================================================================
   // STEP 5: HELPER PER USO THREAD
   // ============================================================================
-  TRedisThreadHelper = class
+  TvmRedisThreadHelper = class
   public
     /// Esegue n operazioni su una connessione dal pool in un thread worker.
     /// Utile per test di carico e verifica della thread-safety del pool.
-    class procedure WorkerThread(aPool: IRedisConnectionPool; aThreadNum: Integer; aIterations: Integer = 10);
+    class procedure WorkerThread(aPool: IvmRedisConnectionPool; aThreadNum: Integer; aIterations: Integer = 10);
   end;
 
 implementation
@@ -245,9 +247,9 @@ implementation
 uses
   System.Math;
 
-{ TRedisPoolConfig }
+{ TvmRedisPoolConfig }
 
-class operator TRedisPoolConfig.Initialize(out Dest: TRedisPoolConfig);
+class operator TvmRedisPoolConfig.Initialize(out Dest: TvmRedisPoolConfig);
 begin
   Dest.MinConnections := 2;          // Mantiene almeno 2 connessioni
   Dest.MaxConnections := 10;         // Max 10 connessioni
@@ -258,12 +260,12 @@ begin
   Dest.ResetOnRelease := False;
 end;
 
-class operator TRedisPoolConfig.Finalize(var Dest: TRedisPoolConfig);
+class operator TvmRedisPoolConfig.Finalize(var Dest: TvmRedisPoolConfig);
 begin
   // Pulizia se necessaria (opzionale per questo caso)
 end;
 
-class operator TRedisPoolConfig.Assign(var Dest: TRedisPoolConfig; const [ref] Src: TRedisPoolConfig);
+class operator TvmRedisPoolConfig.Assign(var Dest: TvmRedisPoolConfig; const [ref] Src: TvmRedisPoolConfig);
 begin
   Dest.MinConnections := Src.MinConnections;
   Dest.MaxConnections := Src.MaxConnections;
@@ -274,7 +276,7 @@ begin
   Dest.ResetOnRelease := Src.ResetOnRelease;
 end;
 
-procedure TRedisPoolConfig.Validate;
+procedure TvmRedisPoolConfig.Validate;
 begin
   if MinConnections < 0 then
     raise Exception.Create('MinConnections deve essere >= 0');
@@ -292,9 +294,9 @@ begin
     raise Exception.Create('ValidationInterval deve essere > 0');
 end;
 
-{ TRedisPoolStats }
+{ TvmRedisPoolStats }
 
-function TRedisPoolStats.ToString: string;
+function TvmRedisPoolStats.ToString: string;
 begin
   var lBuilder := TStringBuilder.Create;
   try
@@ -312,9 +314,9 @@ begin
   end;
 end;
 
-{ TPooledConnection }
+{ TvmPooledConnection }
 
-constructor TPooledConnection.Create(aPool: TRedisConnectionPool; const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger; aTransport: string =
+constructor TvmPooledConnection.Create(aPool: TvmRedisConnectionPool; const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger; aTransport: string =
     'synapse');
 begin
   inherited Create;
@@ -328,11 +330,11 @@ begin
 
   // Crea e connette il client Redis
   FRedisConfig := aConfig;
-  FClient := TRedisClient.New(aConfig, aLogger, aTransport);
+  FClient := TvmRedisClient.New(aConfig, aLogger, aTransport);
   FClient.Connect;
 end;
 
-destructor TPooledConnection.Destroy;
+destructor TvmPooledConnection.Destroy;
 begin
   try
     if Assigned(FClient) then
@@ -349,7 +351,7 @@ begin
   end;
 end;
 
-function TPooledConnection.GetIsHealthy: Boolean;
+function TvmPooledConnection.GetIsHealthy: Boolean;
 begin
   try
     if not Assigned(FClient) then
@@ -370,12 +372,12 @@ begin
   end;
 end;
 
-function TPooledConnection.GetIdleTimeMs: Int64;
+function TvmPooledConnection.GetIdleTimeMs: Int64;
 begin
   Result := MilliSecondsBetween(Now, FLastUsedAt);
 end;
 
-procedure TPooledConnection.EnsureDatabase(aDb: Integer);
+procedure TvmPooledConnection.EnsureDatabase(aDb: Integer);
 begin
   if aDb < 0 then // -1 = non importa il db
     Exit;
@@ -386,11 +388,11 @@ begin
     FClient.Select(aDb);
   except
     on E: Exception do
-      raise ERedisConnectionException.CreateFmt('Impossibile selezionare database %d nella connessione pooled: %s', [aDb, E.Message]);
+      raise EvmRedisConnectionException.CreateFmt('Impossibile selezionare database %d nella connessione pooled: %s', [aDb, E.Message]);
   end;
 end;
 
-procedure TPooledConnection.MarkAsUsed;
+procedure TvmPooledConnection.MarkAsUsed;
 begin
   FLock.Enter;
   try
@@ -402,7 +404,7 @@ begin
   end;
 end;
 
-procedure TPooledConnection.MarkAsIdle;
+procedure TvmPooledConnection.MarkAsIdle;
 begin
   FLock.Enter;
   try
@@ -413,7 +415,7 @@ begin
   end;
 end;
 
-function TPooledConnection.TryAcquire: Boolean;
+function TvmPooledConnection.TryAcquire: Boolean;
 begin
   FLock.Enter;
   try
@@ -429,12 +431,12 @@ begin
   end;
 end;
 
-procedure TPooledConnection.Release;
+procedure TvmPooledConnection.Release;
 begin
   MarkAsIdle;
 end;
 
-function TPooledConnection.Validate: Boolean;
+function TvmPooledConnection.Validate: Boolean;
 begin
   FLock.Enter;
   try
@@ -449,7 +451,7 @@ begin
   end;
 end;
 
-procedure TPooledConnection.ResetErrorCount;
+procedure TvmPooledConnection.ResetErrorCount;
 begin
   FLock.Enter;
   try
@@ -459,7 +461,7 @@ begin
   end;
 end;
 
-function TPooledConnection.ResetState: Boolean;
+function TvmPooledConnection.ResetState: Boolean;
 begin
   try
     // RESET (Redis 6.2+): annulla MULTI/WATCH, esce da Pub/Sub, torna al db 0.
@@ -483,20 +485,20 @@ begin
   end;
 end;
 
-function TPooledConnection.GetCurrentDb: Integer;
+function TvmPooledConnection.GetCurrentDb: Integer;
 begin
   Result := FClient.CurrentDb;
 end;
 
-{ TRedisConnectionPool }
+{ TvmRedisConnectionPool }
 
-class function TRedisConnectionPool.New(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil;
-    aTransport: string = 'synapse'): IRedisConnectionPool;
+class function TvmRedisConnectionPool.New(const aPoolConfig: TvmRedisPoolConfig; const aRedisConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil;
+    aTransport: string = 'synapse'): IvmRedisConnectionPool;
 begin
-  Result := TRedisConnectionPool.Create(aPoolConfig, aRedisConfig, aLogger, aTransport);
+  Result := TvmRedisConnectionPool.Create(aPoolConfig, aRedisConfig, aLogger, aTransport);
 end;
 
-constructor TRedisConnectionPool.Create(const aPoolConfig: TRedisPoolConfig; const aRedisConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil;
+constructor TvmRedisConnectionPool.Create(const aPoolConfig: TvmRedisPoolConfig; const aRedisConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil;
     aTransport: string = 'synapse');
 begin
   inherited Create;
@@ -509,7 +511,7 @@ begin
   FRedisConfig := aRedisConfig;
   FLogger := aLogger;
   FTransport := aTransport;
-  FConnections := TObjectList<TPooledConnection>.Create(True); // OwnsObjects
+  FConnections := TObjectList<TvmPooledConnection>.Create(True); // OwnsObjects
   FLock := TCriticalSection.Create;
   FWaitingRequests := 0;
   FInitialized := False;
@@ -522,7 +524,7 @@ begin
     FLogger.LogInfo('Redis Connection Pool creato');
 end;
 
-destructor TRedisConnectionPool.Destroy;
+destructor TvmRedisConnectionPool.Destroy;
 begin
   Shutdown;
   if Assigned(FConnections) then
@@ -532,12 +534,12 @@ begin
   inherited Destroy;
 end;
 
-function TRedisConnectionPool.GetConfig: TRedisPoolConfig;
+function TvmRedisConnectionPool.GetConfig: TvmRedisPoolConfig;
 begin
   Result := FConfig;
 end;
 
-procedure TRedisConnectionPool.Initialize;
+procedure TvmRedisConnectionPool.Initialize;
 begin
   if FInitialized then 
     Exit;
@@ -555,7 +557,7 @@ begin
   end;
 end;
 
-procedure TRedisConnectionPool.Shutdown;
+procedure TvmRedisConnectionPool.Shutdown;
 begin
   FLock.Enter;
   try
@@ -592,15 +594,15 @@ begin
   end;
 end;
 
-function TRedisConnectionPool.CreateConnection: TPooledConnection;
+function TvmRedisConnectionPool.CreateConnection: TvmPooledConnection;
 begin
-  Result := TPooledConnection.Create(Self, FRedisConfig, FLogger, FTransport);
+  Result := TvmPooledConnection.Create(Self, FRedisConfig, FLogger, FTransport);
 
   if Assigned(FLogger) then
     FLogger.LogDebug('Nuova connessione creata nel pool');
 end;
 
-procedure TRedisConnectionPool.DestroyConnection(aConnection: TPooledConnection);
+procedure TvmRedisConnectionPool.DestroyConnection(aConnection: TvmPooledConnection);
 begin
   if not Assigned(aConnection) then
     Exit;
@@ -617,7 +619,7 @@ begin
   end;
 end;
 
-function TRedisConnectionPool.FindIdleConnection: TPooledConnection;
+function TvmRedisConnectionPool.FindIdleConnection: TvmPooledConnection;
 begin
   Result := nil;
 
@@ -644,12 +646,12 @@ begin
   end;
 end;
 
-function TRedisConnectionPool.CanCreateNewConnection: Boolean;
+function TvmRedisConnectionPool.CanCreateNewConnection: Boolean;
 begin
   Result := FConnections.Count < FConfig.MaxConnections;
 end;
 
-procedure TRedisConnectionPool.EnsureMinConnections;
+procedure TvmRedisConnectionPool.EnsureMinConnections;
 begin
   var CurrentCount := FConnections.Count;
 
@@ -674,7 +676,7 @@ begin
   end;
 end;
 
-procedure TRedisConnectionPool.CleanupIdleConnections;
+procedure TvmRedisConnectionPool.CleanupIdleConnections;
 begin
   if FConfig.IdleTimeout <= 0 then
     Exit;
@@ -712,12 +714,12 @@ begin
     FLogger.LogInfo(Format('Rimosse %d connessioni idle', [RemovedCount]));
 end;
 
-procedure TRedisConnectionPool.ValidateConnections;
+procedure TvmRedisConnectionPool.ValidateConnections;
 begin
   if not FConfig.EnableHealthCheck then
     Exit;
 
-  var lInvalid := TList<TPooledConnection>.Create;
+  var lInvalid := TList<TvmPooledConnection>.Create;
   try
     for var lConn in FConnections do
       if not lConn.InUse and not lConn.Validate then
@@ -739,14 +741,14 @@ begin
   end;
 end;
 
-function TRedisConnectionPool.InternalAcquire(aDb: Integer): IRedisClient;
+function TvmRedisConnectionPool.InternalAcquire(aDb: Integer): IvmRedisClient;
 var
-  lConnection: TPooledConnection;
+  lConnection: TvmPooledConnection;
 begin
   if not FInitialized then
-    raise ERedisException.Create('Pool non inizializzato. Chiamare Initialize prima.');
+    raise EvmRedisException.Create('Pool non inizializzato. Chiamare Initialize prima.');
   if FShutdown then
-    raise ERedisException.Create('Pool in fase di shutdown');
+    raise EvmRedisException.Create('Pool in fase di shutdown');
 
   var lStart := Now;
   var lTimeoutTime := IncMilliSecond(lStart, FConfig.AcquireTimeout);
@@ -789,7 +791,7 @@ begin
     end;
 
     if lConnection = nil then
-      raise ERedisTimeoutException.CreateFmt('Timeout acquisizione connessione dopo %d ms. Pool saturo?', [FConfig.AcquireTimeout]);
+      raise EvmRedisTimeoutException.CreateFmt('Timeout acquisizione connessione dopo %d ms. Pool saturo?', [FConfig.AcquireTimeout]);
 
     {-------------------------------------------------------------------------------------
       Author: Muzio
@@ -828,17 +830,17 @@ begin
   end;
 end;
 
-function TRedisConnectionPool.AcquireConnection: IRedisClient;
+function TvmRedisConnectionPool.AcquireConnection: IvmRedisClient;
 begin
   Result := InternalAcquire(FRedisConfig.Database);
 end;
 
-function TRedisConnectionPool.AcquireConnectionOnDb(aDb: Integer): IRedisClient;
+function TvmRedisConnectionPool.AcquireConnectionOnDb(aDb: Integer): IvmRedisClient;
 begin
   Result := InternalAcquire(aDb);
 end;
 
-procedure TRedisConnectionPool.ReleaseConnection(aClient: IRedisClient);
+procedure TvmRedisConnectionPool.ReleaseConnection(aClient: IvmRedisClient);
 begin
   if not Assigned(aClient) then
     Exit;
@@ -888,13 +890,13 @@ begin
   end;
 end;
 
-procedure TRedisConnectionPool.UpdateAcquireTime(aTimeMs: Int64);
+procedure TvmRedisConnectionPool.UpdateAcquireTime(aTimeMs: Int64);
 begin
   var TotalAcquired := FStats.TotalAcquired + 1;
   FStats.AverageAcquireTimeMs := (FStats.AverageAcquireTimeMs * (TotalAcquired - 1) + aTimeMs) / TotalAcquired;
 end;
 
-function TRedisConnectionPool.GetStats: TRedisPoolStats;
+function TvmRedisConnectionPool.GetStats: TvmRedisPoolStats;
 begin
   FLock.Enter;
   try
@@ -917,7 +919,7 @@ begin
   end;
 end;
 
-procedure TRedisConnectionPool.LogStats;
+procedure TvmRedisConnectionPool.LogStats;
 begin
   if not Assigned(FLogger) then
     Exit;
@@ -928,9 +930,9 @@ begin
   FLogger.LogInfo('==================================');
 end;
 
-{ TRedisPoolHelper }
+{ TvmRedisPoolHelper }
 
-class function TRedisPoolHelper.Execute<T>(aPool: IRedisConnectionPool; aFunc: TFunc<IRedisClient, T>): T;
+class function TvmRedisPoolHelper.Execute<T>(aPool: IvmRedisConnectionPool; aFunc: TFunc<IvmRedisClient, T>): T;
 begin
   var lClient := aPool.AcquireConnection;
   try
@@ -940,7 +942,7 @@ begin
   end;
 end;
 
-class procedure TRedisPoolHelper.Execute(aPool: IRedisConnectionPool; aProc: TProc<IRedisClient>);
+class procedure TvmRedisPoolHelper.Execute(aPool: IvmRedisConnectionPool; aProc: TProc<IvmRedisClient>);
 begin
   var lClient := aPool.AcquireConnection;
   try
@@ -950,28 +952,28 @@ begin
   end;
 end;
 
-{ TPooledRedisClient }
+{ TvmPooledRedisClient }
 
-class operator TPooledRedisClient.Initialize(out Dest: TPooledRedisClient);
+class operator TvmPooledRedisClient.Initialize(out Dest: TvmPooledRedisClient);
 begin
   Dest.Pool := nil;
   Dest.Client := nil;
   Dest.Acquired := False;
 end;
 
-class operator TPooledRedisClient.Finalize(var Dest: TPooledRedisClient);
+class operator TvmPooledRedisClient.Finalize(var Dest: TvmPooledRedisClient);
 begin
   Dest.Release;
 end;
 
-constructor TPooledRedisClient.Create(aPool: IRedisConnectionPool);
+constructor TvmPooledRedisClient.Create(aPool: IvmRedisConnectionPool);
 begin
   Pool := aPool;
   Client := Pool.AcquireConnection;
   Acquired := True;
 end;
 
-procedure TPooledRedisClient.Release;
+procedure TvmPooledRedisClient.Release;
 begin
   if Acquired and Assigned(Client) then
   begin
@@ -981,14 +983,14 @@ begin
   end;
 end;
 
-{ TRedisThreadHelper }
+{ TvmRedisThreadHelper }
 
-class procedure TRedisThreadHelper.WorkerThread(aPool: IRedisConnectionPool; aThreadNum: Integer; aIterations: Integer);
+class procedure TvmRedisThreadHelper.WorkerThread(aPool: IvmRedisConnectionPool; aThreadNum: Integer; aIterations: Integer);
 begin
   for var I := 1 to aIterations do
   begin
-    TRedisPoolHelper.Execute(aPool,
-      procedure(aClient: IRedisClient)
+    TvmRedisPoolHelper.Execute(aPool,
+      procedure(aClient: IvmRedisClient)
       begin
         var lKey := Format('thread:%d:counter', [aThreadNum]);
         aClient.Incr(lKey);

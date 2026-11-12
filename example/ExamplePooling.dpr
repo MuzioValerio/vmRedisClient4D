@@ -34,28 +34,28 @@ uses
   System.SysUtils,
   System.Classes,
   System.Threading,
-  Redis.Client.Intf in '..\sources\Redis.Client.Intf.pas',
-  Redis.Client in '..\sources\Redis.Client.pas',
-  Redis.Connection.Config in '..\sources\Redis.Connection.Config.pas',
-  Redis.HealthCheck in '..\sources\Redis.HealthCheck.pas',
-  Redis.Logger.Empty in '..\sources\Redis.Logger.Empty.pas',
-  Redis.Pool in '..\sources\Redis.Pool.pas',
-  Redis.Protocol in '..\sources\Redis.Protocol.pas',
-  Redis.PubSub in '..\sources\Redis.PubSub.pas',
-  Redis.Response in '..\sources\Redis.Response.pas',
-  Redis.Transport.Intf in '..\sources\Redis.Transport.Intf.pas',
-  Redis.Transport.Registry in '..\sources\Redis.Transport.Registry.pas',
-  Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas',
-  Redis.Types in '..\sources\Redis.Types.pas',
-  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas';
+  vmRedis.Client.Intf in '..\sources\vmRedis.Client.Intf.pas',
+  vmRedis.Client in '..\sources\vmRedis.Client.pas',
+  vmRedis.Connection.Config in '..\sources\vmRedis.Connection.Config.pas',
+  vmRedis.HealthCheck in '..\sources\vmRedis.HealthCheck.pas',
+  vmRedis.Logger.Empty in '..\sources\vmRedis.Logger.Empty.pas',
+  vmRedis.Pool in '..\sources\vmRedis.Pool.pas',
+  vmRedis.Protocol in '..\sources\vmRedis.Protocol.pas',
+  vmRedis.PubSub in '..\sources\vmRedis.PubSub.pas',
+  vmRedis.Response in '..\sources\vmRedis.Response.pas',
+  vmRedis.Transport.Intf in '..\sources\vmRedis.Transport.Intf.pas',
+  vmRedis.Transport.Registry in '..\sources\vmRedis.Transport.Registry.pas',
+  vmRedis.Transport.Synapse in '..\sources\vmRedis.Transport.Synapse.pas',
+  vmRedis.Types in '..\sources\vmRedis.Types.pas',
+  vmRedis.Transport.Grijjy in '..\sources\vmRedis.Transport.Grijjy.pas';
 
 // ----------------------------------------------------------------------------
 // ESEMPIO 1: Setup base del lPoolConfig
 // ----------------------------------------------------------------------------
 procedure Example1_BasicSetup;
 var
-  lPoolConfig: TRedisPoolConfig;
-  lRedisConfig: TRedisConnectionConfig;
+  lPoolConfig: TvmRedisPoolConfig;
+  lRedisConfig: TvmRedisConnectionConfig;
 begin
   WriteLn('=== Esempio 1: Setup Base ===');
 
@@ -70,10 +70,10 @@ begin
 
   // Crea pool
   // Usa il Transport Grijjy per la connessione
-//  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
+//  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
 
   // Usa il Transport Synapse per la connessione
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
+  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
 
   lPool.Initialize;
   try
@@ -89,16 +89,16 @@ end;
 // ----------------------------------------------------------------------------
 procedure Example2_ManualAcquireRelease;
 var
-  lPoolConfig: TRedisPoolConfig;
-  lRedisConfig: TRedisConnectionConfig;
+  lPoolConfig: TvmRedisPoolConfig;
+  lRedisConfig: TvmRedisConnectionConfig;
 begin
   WriteLn('=== Esempio 2: Acquire/Release Manuale ===');
 
   // Usa il Transport Grijjy per la connessione
-//  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
+//  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
 
   // Usa il Transport Synapse per la connessione
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
+  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
 
   lPool.Initialize;
   try
@@ -125,22 +125,22 @@ end;
 // ----------------------------------------------------------------------------
 procedure Example3_WithHelper;
 var
-  lPoolConfig: TRedisPoolConfig;
-  lRedisConfig: TRedisConnectionConfig;
+  lPoolConfig: TvmRedisPoolConfig;
+  lRedisConfig: TvmRedisConnectionConfig;
 begin
   WriteLn('=== Esempio 3: Con Helper ===');
 
   // Usa il Transport Grijjy per la connessione
-//  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
+//  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
 
   // Usa il Transport Synapse per la connessione
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
+  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
 
   lPool.Initialize;
   try
     // Eseguo operazione con gestione automatica
-    TRedisPoolHelper.Execute(lPool,
-      procedure(aClient: IRedisClient)
+    TvmRedisPoolHelper.Execute(lPool,
+      procedure(aClient: IvmRedisClient)
       begin
         aClient.SetValue('user:1:name', 'Muzio Valerio');
         aClient.SetValue('user:1:email', 'muzio_valerio@example.com');
@@ -148,16 +148,16 @@ begin
     );
 
     // Leggo valore con return
-    var Value := TRedisPoolHelper.Execute<string>(lPool,
-      function(aClient: IRedisClient): string
+    var Value := TvmRedisPoolHelper.Execute<string>(lPool,
+      function(aClient: IvmRedisClient): string
       begin
         var Response := aClient.Get('user:1:name');
         Result := Response.AsString;
       end
     );
 
-    var Value1 := TRedisPoolHelper.Execute<string>(lPool,
-      function(aClient: IRedisClient): string
+    var Value1 := TvmRedisPoolHelper.Execute<string>(lPool,
+      function(aClient: IvmRedisClient): string
       begin
         var Response := aClient.Get('user:1:email');
         Result := Response.AsString;
@@ -178,21 +178,21 @@ end;
 // ----------------------------------------------------------------------------
 procedure Example4_WithRecord;
 var
-  lPoolConfig: TRedisPoolConfig;
-  lRedisConfig: TRedisConnectionConfig;
+  lPoolConfig: TvmRedisPoolConfig;
+  lRedisConfig: TvmRedisConnectionConfig;
 begin
   WriteLn('=== Esempio 4: Con Record (Auto-release) ===');
 
   // Usa il Transport Grijjy per la connessione
-//  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
+//  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
 
   // Usa il Transport Synapse per la connessione
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
+  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
 
   lPool.Initialize;
   try
     // Il record gestisce automaticamente acquire/release
-    var lPooledClient := TPooledRedisClient.Create(lPool);
+    var lPooledClient := TvmPooledRedisClient.Create(lPool);
     // Il Finalize rilascerà automaticamente alla fine dello scope
 
     lPooledClient.Client.SetValue('counter', '0');
@@ -217,8 +217,8 @@ type
 
 procedure Example5_Concurrent;
 var
-  lPoolConfig: TRedisPoolConfig;
-  lRedisConfig: TRedisConnectionConfig;
+  lPoolConfig: TvmRedisPoolConfig;
+  lRedisConfig: TvmRedisConnectionConfig;
   Threads: array[1..5] of TThread;
   I: Integer;
   lThreadNum: Integer;
@@ -228,10 +228,10 @@ begin
 
   // Pool con più connessioni per gestire concorrenza
   // Usa il Transport Grijjy per la connessione
-//  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
+//  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
 
   // Usa il Transport Synapse per la connessione
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
+  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
 
   lPool.Initialize;
   try
@@ -243,8 +243,8 @@ begin
               begin
                 for J := 1 to 10 do
                 begin
-                  TRedisPoolHelper.Execute(lPool,
-                    procedure(aClient: IRedisClient)
+                  TvmRedisPoolHelper.Execute(lPool,
+                    procedure(aClient: IvmRedisClient)
                     begin
                       aClient.Incr(Format('thread:%d;counter', [aThreadNum]));
                       Sleep(Random(100));
@@ -280,10 +280,10 @@ begin
     lPool.LogStats;
 
     // Verifica risultati
-    TRedisPoolHelper.Execute(lPool,
-      procedure(aClient: IRedisClient)
+    TvmRedisPoolHelper.Execute(lPool,
+      procedure(aClient: IvmRedisClient)
       var
-        lResponse: IRedisResponse;
+        lResponse: IvmRedisResponse;
       begin
         for var I := 1 to 5 do
         begin
@@ -302,24 +302,24 @@ end;
 // ----------------------------------------------------------------------------
 procedure Example6_Monitoring;
 var
-  lPoolConfig: TRedisPoolConfig;
-  lRedisConfig: TRedisConnectionConfig;
+  lPoolConfig: TvmRedisPoolConfig;
+  lRedisConfig: TvmRedisConnectionConfig;
 begin
   WriteLn('=== Esempio 6: Monitoraggio ===');
 
   // Usa il Transport Grijjy per la connessione
-//  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
+//  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
 
   // Usa il Transport Synapse per la connessione
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
+  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
 
   lPool.Initialize;
   try
     // Esegue alcune operazioni
     for var I := 1 to 20 do
     begin
-      TRedisPoolHelper.Execute(lPool,
-        procedure(aClient: IRedisClient)
+      TvmRedisPoolHelper.Execute(lPool,
+        procedure(aClient: IvmRedisClient)
         begin
           aClient.SetValue(Format('key:%d', [I]), Format('value:%d', [I]));
         end
@@ -347,22 +347,22 @@ end;
 // ----------------------------------------------------------------------------
 procedure Example7_ErrorHandling;
 var
-  lPoolConfig: TRedisPoolConfig;
-  lRedisConfig: TRedisConnectionConfig;
+  lPoolConfig: TvmRedisPoolConfig;
+  lRedisConfig: TvmRedisConnectionConfig;
 begin
   WriteLn('=== Esempio 7: Gestione Errori ===');
 
   // Usa il Transport Grijjy per la connessione
-//  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
+//  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
 
   // Usa il Transport Synapse per la connessione
-  var lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
+  var lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
 
   lPool.Initialize;
   try
     try
-      TRedisPoolHelper.Execute(lPool,
-        procedure(aClient: IRedisClient)
+      TvmRedisPoolHelper.Execute(lPool,
+        procedure(aClient: IvmRedisClient)
         begin
           // Operazione che potrebbe fallire
           aClient.SetValue('test', 'value');
@@ -378,8 +378,8 @@ begin
     end;
 
     // Il Pool è ancora utilizzabile
-    TRedisPoolHelper.Execute(lPool,
-      procedure(aClient: IRedisClient)
+    TvmRedisPoolHelper.Execute(lPool,
+      procedure(aClient: IvmRedisClient)
       begin
         WriteLn('Pool ancora funzionante!');
       end
@@ -396,9 +396,9 @@ end;
 // ----------------------------------------------------------------------------
 procedure Example8_Concurrent_WithErrorHandling;
 var
-  lPool: IRedisConnectionPool;
-  lPoolConfig: TRedisPoolConfig;
-  lRedisConfig: TRedisConnectionConfig;
+  lPool: IvmRedisConnectionPool;
+  lPoolConfig: TvmRedisPoolConfig;
+  lRedisConfig: TvmRedisConnectionConfig;
   Tasks: array[1..5] of ITask;
   I: Integer;
 
@@ -412,8 +412,8 @@ begin
 
         for var J := 1 to 10 do
         begin
-          TRedisPoolHelper.Execute(lPool,
-            procedure(Client: IRedisClient)
+          TvmRedisPoolHelper.Execute(lPool,
+            procedure(Client: IvmRedisClient)
             var
               Key: string;
             begin
@@ -445,10 +445,10 @@ begin
   lPoolConfig.AcquireTimeout := 5000;
 
   // Usa il Transport Grijjy per la connessione
-//  lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
+//  lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'grijjy');
 
   // Usa il Transport Synapse per la connessione
-  lPool := TRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
+  lPool := TvmRedisConnectionPool.New(lPoolConfig, lRedisConfig, nil, 'synapse');
 
   lPool.Initialize;
 
@@ -499,8 +499,8 @@ begin
     if SuccessCount > 0 then
     begin
       WriteLn('Verifica contatori finali:');
-      TRedisPoolHelper.Execute(lPool,
-        procedure(Client: IRedisClient)
+      TvmRedisPoolHelper.Execute(lPool,
+        procedure(Client: IvmRedisClient)
         begin
           for var Z := 1 to 5 do
           begin

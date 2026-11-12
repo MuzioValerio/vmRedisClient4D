@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Transport.Intf
+ Unit Name: vmRedis.Transport.Intf
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio
  Date:      26-mar-2026
@@ -19,32 +19,34 @@
 
  Info:
    Interfaccia unificata per il trasporto Redis.
-   Sostituisce sia IRedisTransport (too thin) sia IRedisSynapseTransport
+   Sostituisce sia IvmRedisTransport (too thin) sia IvmRedisSynapseTransport
    (too coupled to Synapse). Tutti i transport (Synapse, Grijjy, ecc.)
    implementano questa interfaccia.
 
-   IRedisDataReader è mantenuto per retrocompatibilità col TRedisProtocolParser.
+   IvmRedisDataReader è mantenuto per retrocompatibilità col TvmRedisProtocolParser.
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Transport.Intf;
+unit vmRedis.Transport.Intf;
 
 interface
 
 uses
   System.Classes, System.SysUtils,
-  Redis.Connection.Config,
-  Redis.Types;
+  vmRedis.Connection.Config,
+  vmRedis.Types;
 
 type
-  // Lettura dati grezzi — usata dal TRedisProtocolParser
-  IRedisDataReader = interface(IInterface)
+  // Lettura dati grezzi — usata dal TvmRedisProtocolParser
+  IvmRedisDataReader = interface(IInterface)
   ['{C60DC95F-C6E2-4E08-9A6A-9436AC8D8516}']
     function ReadLine: string;
     function ReadBytes(aCount: Integer): TBytes;
   end;
 
   // Interfaccia unificata per tutti i transport Redis
-  IRedisTransport = interface(IRedisDataReader)
+  IvmRedisTransport = interface(IvmRedisDataReader)
   ['{FD938863-245D-4DAE-87BE-BD8DFC12E79E}']
     procedure Connect;
     procedure Disconnect;
@@ -64,12 +66,12 @@ type
   end;
 
   // Alias di compatibilità — il vecchio nome usato nel progetto
-  // Tutto il codice che usava IRedisSynapseTransport può continuare
+  // Tutto il codice che usava IvmRedisSynapseTransport può continuare
   // a farlo senza modifiche: punta alla stessa interfaccia.
-  IRedisSynapseTransport = IRedisTransport;
+  IvmRedisSynapseTransport = IvmRedisTransport;
 
   // Tipo del factory method usato dal Registry
-  TTransportActivator = reference to function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport;
+  TvmTransportActivator = reference to function(const aConfig: TvmRedisConnectionConfig; const aLogger: IvmRedisLogger): IvmRedisTransport;
 
 implementation
 

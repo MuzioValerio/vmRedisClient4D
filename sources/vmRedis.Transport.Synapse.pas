@@ -1,6 +1,6 @@
 {-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Transport.Synapse
+ Unit Name: vmRedis.Transport.Synapse
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio
  Date:      14-dic-2025
@@ -23,30 +23,32 @@
     - includere questa unit nel progetto per abilitare il provider 'synapse'.
  Purpose:
  History:
-  - Updated:   2026 - Implementa IRedisTransport (alias IRedisSynapseTransport),
+  - Updated:   2026 - Implementa IvmRedisTransport (alias IvmRedisSynapseTransport),
                       autoregistrazione nel Registry con ID = 'synapse'
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Transport.Synapse;
+unit vmRedis.Transport.Synapse;
 
 interface
 
 uses
   System.SysUtils, System.Classes,
   synsock, blcksock, ssl_openssl3, synautil,
-  Redis.Types,
-  Redis.Protocol,
-  Redis.Transport.Intf,
-  Redis.Transport.Registry,
-  Redis.Connection.Config;
+  vmRedis.Types,
+  vmRedis.Protocol,
+  vmRedis.Transport.Intf,
+  vmRedis.Transport.Registry,
+  vmRedis.Connection.Config;
 
 type
-  TRedisSynapseTransport = class(TInterfacedObject, IRedisTransport)
+  TvmRedisSynapseTransport = class(TInterfacedObject, IvmRedisTransport)
   strict private
     FSocket: TTCPBlockSocket;
-    FConfig: TRedisConnectionConfig;
+    FConfig: TvmRedisConnectionConfig;
     FConnected: Boolean;
-    FLogger: IRedisLogger;
+    FLogger: IvmRedisLogger;
 
     // Pipeline buffer
     FPipelineBuffer: TMemoryStream;
@@ -60,13 +62,13 @@ type
     procedure Log(const aMessage: string; aIsError: Boolean = False);
     function  ReadRawLine: string;
   private  
-    constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil); reintroduce;
+    constructor Create(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil); reintroduce;
   public
     destructor  Destroy; override;
 
-    class function New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil): IRedisTransport;
+    class function New(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil): IvmRedisTransport;
 
-    { IRedisTransport }
+    { IvmRedisTransport }
     procedure Connect;
     procedure Disconnect;
     function  IsConnected: Boolean;
@@ -76,21 +78,21 @@ type
     function  FlushPipeline: TBytes;
     function  IsPipelining: Boolean;
 
-    { IRedisDataReader }
+    { IvmRedisDataReader }
     function ReadLine: string;
     function ReadBytes(aCount: Integer): TBytes;
   end;
 
 implementation
 
-{ TRedisSynapseTransport }
+{ TvmRedisSynapseTransport }
 
-class function TRedisSynapseTransport.New(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger): IRedisTransport;
+class function TvmRedisSynapseTransport.New(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger): IvmRedisTransport;
 begin
-  Result := TRedisSynapseTransport.Create(aConfig, aLogger);
+  Result := TvmRedisSynapseTransport.Create(aConfig, aLogger);
 end;
 
-constructor TRedisSynapseTransport.Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger);
+constructor TvmRedisSynapseTransport.Create(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger);
 begin
   inherited Create;
   aConfig.Validate;
@@ -110,7 +112,7 @@ begin
   Log('Transport Synapse creato per ' + aConfig.Host + ':' + IntToStr(aConfig.Port));
 end;
 
-destructor TRedisSynapseTransport.Destroy;
+destructor TvmRedisSynapseTransport.Destroy;
 begin
   Disconnect;
   FSocket.Free;
@@ -118,7 +120,7 @@ begin
   inherited;
 end;
 
-procedure TRedisSynapseTransport.Log(const aMessage: string; aIsError: Boolean);
+procedure TvmRedisSynapseTransport.Log(const aMessage: string; aIsError: Boolean);
 begin
   if not Assigned(FLogger) then 
     Exit;
@@ -128,7 +130,7 @@ begin
     FLogger.LogInfo(aMessage);
 end;
 
-procedure TRedisSynapseTransport.SetupSSL;
+procedure TvmRedisSynapseTransport.SetupSSL;
 begin
   try
     FSocket.SSL.SSLType := LT_TLSv1_2;
@@ -146,31 +148,31 @@ begin
     on E: Exception do
     begin
       Log('Errore configurazione SSL: ' + E.Message, True);
-      raise ERedisConnectionException.Create('Impossibile configurare SSL. Verifica le librerie OpenSSL. Errore: ' + E.Message);
+      raise EvmRedisConnectionException.Create('Impossibile configurare SSL. Verifica le librerie OpenSSL. Errore: ' + E.Message);
     end;
   end;
 end;
 
-procedure TRedisSynapseTransport.InternalConnect;
+procedure TvmRedisSynapseTransport.InternalConnect;
 begin
   FSocket.Connect(FConfig.Host, IntToStr(FConfig.Port));
 
   if FSocket.LastError <> 0 then
-    raise ERedisConnectionException.Create('Errore connessione TCP: ' + FSocket.LastErrorDesc);
+    raise EvmRedisConnectionException.Create('Errore connessione TCP: ' + FSocket.LastErrorDesc);
 
   if FConfig.UseSSL then
   begin
     SetupSSL;
     FSocket.SSLDoConnect;
     if FSocket.LastError <> 0 then
-      raise ERedisConnectionException.Create('Errore handshake SSL: ' + FSocket.LastErrorDesc);
+      raise EvmRedisConnectionException.Create('Errore handshake SSL: ' + FSocket.LastErrorDesc);
     Log('Connessione SSL stabilita');
   end;
 
   Log('Connesso a Redis: ' + FConfig.Host + ':' + IntToStr(FConfig.Port));
 end;
 
-function TRedisSynapseTransport.ReadRawLine: string;
+function TvmRedisSynapseTransport.ReadRawLine: string;
 var
   lLine: AnsiString;
 begin
@@ -178,7 +180,7 @@ begin
   Result := string(lLine);
 end;
 
-procedure TRedisSynapseTransport.AuthenticateWithRetry;
+procedure TvmRedisSynapseTransport.AuthenticateWithRetry;
 var
   lRawResp: string;
   lRetries: Integer;
@@ -205,11 +207,11 @@ begin
           Log('Autenticazione completata con successo');
         end
         else if lRawResp.StartsWith('-') then
-          raise ERedisConnectionException.Create('Autenticazione rifiutata dal server: ' + lRawResp.Substring(1))
+          raise EvmRedisConnectionException.Create('Autenticazione rifiutata dal server: ' + lRawResp.Substring(1))
         else
-          raise ERedisConnectionException.Create('Risposta autenticazione inattesa: ' + lRawResp);
+          raise EvmRedisConnectionException.Create('Risposta autenticazione inattesa: ' + lRawResp);
       except
-        on E: ERedisConnectionException do
+        on E: EvmRedisConnectionException do
           raise;
         on E: Exception do
         begin
@@ -217,7 +219,7 @@ begin
           if lRetries > FConfig.MaxRetries then
           begin
             Log('Autenticazione fallita dopo ' + IntToStr(lRetries) + ' tentativi', True);
-            raise ERedisConnectionException.Create('Autenticazione fallita: ' + E.Message);
+            raise EvmRedisConnectionException.Create('Autenticazione fallita: ' + E.Message);
           end;
           Sleep(FConfig.RetryDelayMs * lRetries);
         end;
@@ -230,12 +232,12 @@ begin
     SendCommand(['SELECT', IntToStr(FConfig.Database)]);
     var lResp := ReadRawLine;
     if not lResp.StartsWith('+') then
-      raise ERedisConnectionException.Create('Selezione database ' + IntToStr(FConfig.Database) + ' fallita: ' + lResp);
+      raise EvmRedisConnectionException.Create('Selezione database ' + IntToStr(FConfig.Database) + ' fallita: ' + lResp);
     Log('Database ' + IntToStr(FConfig.Database) + ' selezionato');
   end;
 end;
 
-procedure TRedisSynapseTransport.SetClientName;
+procedure TvmRedisSynapseTransport.SetClientName;
 begin
   if FConfig.ClientName.Trim = '' then Exit;
   try
@@ -251,7 +253,7 @@ begin
   end;
 end;
 
-procedure TRedisSynapseTransport.Connect;
+procedure TvmRedisSynapseTransport.Connect;
 var
   lConnected: Boolean;
   lRetries: Integer;
@@ -281,7 +283,7 @@ begin
         if lRetries > FConfig.MaxRetries then
         begin
           Log('Connessione fallita dopo ' + IntToStr(lRetries) + ' tentativi', True);
-          raise ERedisConnectionException.CreateFmt(
+          raise EvmRedisConnectionException.CreateFmt(
             'Impossibile connettersi a Redis dopo %d tentativi. Errore: %s',
             [lRetries, E.Message]);
         end;
@@ -293,7 +295,7 @@ begin
   end;
 end;
 
-procedure TRedisSynapseTransport.Disconnect;
+procedure TvmRedisSynapseTransport.Disconnect;
 begin
   if FSocket.Socket <> INVALID_SOCKET then
   begin
@@ -320,17 +322,17 @@ begin
   FPipelineBuffer.Clear;
 end;
 
-function TRedisSynapseTransport.IsConnected: Boolean;
+function TvmRedisSynapseTransport.IsConnected: Boolean;
 begin
   Result := FConnected and (FSocket.Socket <> INVALID_SOCKET);
 end;
 
-procedure TRedisSynapseTransport.Send(const aData: TBytes);
+procedure TvmRedisSynapseTransport.Send(const aData: TBytes);
 var
   lDataStr: AnsiString;
 begin
   if not IsConnected then
-    raise ERedisConnectionException.Create('Non connesso al server Redis');
+    raise EvmRedisConnectionException.Create('Non connesso al server Redis');
 
   try
     SetLength(lDataStr, Length(aData));
@@ -340,18 +342,18 @@ begin
     FSocket.SendString(lDataStr);
 
     if FSocket.LastError <> 0 then
-      raise ERedisConnectionException.Create('Errore invio dati: ' + FSocket.LastErrorDesc);
+      raise EvmRedisConnectionException.Create('Errore invio dati: ' + FSocket.LastErrorDesc);
   except
     on E: Exception do
     begin
       FConnected := False;
       Log('Errore invio dati: ' + E.Message, True);
-      raise ERedisConnectionException.Create('Errore invio comando: ' + E.Message);
+      raise EvmRedisConnectionException.Create('Errore invio comando: ' + E.Message);
     end;
   end;
 end;
 
-procedure TRedisSynapseTransport.SendCommand(const aParts: array of string);
+procedure TvmRedisSynapseTransport.SendCommand(const aParts: array of string);
 begin
   if Assigned(FLogger) then
   begin
@@ -367,17 +369,17 @@ begin
     FLogger.LogCommand(lCmdStr);
   end;
 
-  Send(TRedisCommandSerializer.Serialize(aParts));
+  Send(TvmRedisCommandSerializer.Serialize(aParts));
 end;
 
-procedure TRedisSynapseTransport.PipelineCommand(const aParts: array of string);
+procedure TvmRedisSynapseTransport.PipelineCommand(const aParts: array of string);
 var
   lData: TBytes;
 begin
   if not IsConnected then
-    raise ERedisConnectionException.Create('Non connesso al server Redis');
+    raise EvmRedisConnectionException.Create('Non connesso al server Redis');
 
-  lData := TRedisCommandSerializer.Serialize(aParts);
+  lData := TvmRedisCommandSerializer.Serialize(aParts);
   FPipelineBuffer.Write(lData[0], Length(lData));
   Inc(FPipelineCount);
   FPipelining := True;
@@ -386,7 +388,7 @@ begin
     FLogger.LogDebug(Format('Pipeline buffer: %d comandi accodati', [FPipelineCount]));
 end;
 
-function TRedisSynapseTransport.FlushPipeline: TBytes;
+function TvmRedisSynapseTransport.FlushPipeline: TBytes;
 var
   lCount: Integer;
 begin
@@ -411,15 +413,15 @@ begin
     FLogger.LogDebug(Format('Pipeline flushed: %d comandi inviati', [lCount]));
 end;
 
-function TRedisSynapseTransport.IsPipelining: Boolean;
+function TvmRedisSynapseTransport.IsPipelining: Boolean;
 begin
   Result := FPipelining;
 end;
 
-function TRedisSynapseTransport.ReadLine: string;
+function TvmRedisSynapseTransport.ReadLine: string;
 begin
   if not IsConnected then
-    raise ERedisConnectionException.Create('Non connesso al server Redis');
+    raise EvmRedisConnectionException.Create('Non connesso al server Redis');
 
   try
     var lLine := FSocket.RecvString(FConfig.ReadTimeout);
@@ -427,9 +429,9 @@ begin
     if FSocket.LastError <> 0 then
     begin
       if FSocket.LastError = WSAETIMEDOUT then
-        raise ERedisTimeoutException.Create('Timeout lettura risposta dal server Redis')
+        raise EvmRedisTimeoutException.Create('Timeout lettura risposta dal server Redis')
       else
-        raise ERedisConnectionException.Create('Errore lettura risposta: ' + FSocket.LastErrorDesc);
+        raise EvmRedisConnectionException.Create('Errore lettura risposta: ' + FSocket.LastErrorDesc);
     end;
 
     Result := string(lLine);
@@ -437,7 +439,7 @@ begin
     if Assigned(FLogger) then
       FLogger.LogResponse(Result);
   except
-    on E: ERedisTimeoutException do
+    on E: EvmRedisTimeoutException do
     begin
       Log('Timeout lettura risposta', True);
       raise;
@@ -446,23 +448,23 @@ begin
     begin
       FConnected := False;
       Log('Errore lettura risposta: ' + E.Message, True);
-      raise ERedisConnectionException.Create('Errore lettura risposta: ' + E.Message);
+      raise EvmRedisConnectionException.Create('Errore lettura risposta: ' + E.Message);
     end;
   end;
 end;
 
-function TRedisSynapseTransport.ReadBytes(aCount: Integer): TBytes;
+function TvmRedisSynapseTransport.ReadBytes(aCount: Integer): TBytes;
 var
   lBuffer: AnsiString;
 begin
   if not IsConnected then
-    raise ERedisConnectionException.Create('Non connesso al server Redis');
+    raise EvmRedisConnectionException.Create('Non connesso al server Redis');
 
   try
     lBuffer := FSocket.RecvBufferStr(aCount, FConfig.ReadTimeout);
 
     if FSocket.LastError <> 0 then
-      raise ERedisConnectionException.Create('Errore lettura bytes: ' + FSocket.LastErrorDesc);
+      raise EvmRedisConnectionException.Create('Errore lettura bytes: ' + FSocket.LastErrorDesc);
 
     SetLength(Result, Length(lBuffer));
     if Length(lBuffer) > 0 then
@@ -472,7 +474,7 @@ begin
     begin
       FConnected := False;
       Log('Errore lettura bytes: ' + E.Message, True);
-      raise ERedisConnectionException.Create('Errore lettura dati: ' + E.Message);
+      raise EvmRedisConnectionException.Create('Errore lettura dati: ' + E.Message);
     end;
   end;
 end;
@@ -482,10 +484,10 @@ end;
 // ---------------------------------------------------------------------------
 
 initialization
-  TRedisTransportRegistry.RegisterProvider('synapse',
-    function(const aConfig: TRedisConnectionConfig; const aLogger: IRedisLogger): IRedisTransport
+  TvmRedisTransportRegistry.RegisterProvider('synapse',
+    function(const aConfig: TvmRedisConnectionConfig; const aLogger: IvmRedisLogger): IvmRedisTransport
     begin
-      Result := TRedisSynapseTransport.New(aConfig, aLogger);
+      Result := TvmRedisSynapseTransport.New(aConfig, aLogger);
     end);
 
 end.

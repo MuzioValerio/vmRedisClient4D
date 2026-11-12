@@ -32,27 +32,27 @@ uses
   System.SysUtils,
   System.Classes,
   System.DateUtils,
-  Redis.Client.Intf in '..\sources\Redis.Client.Intf.pas',
-  Redis.Client in '..\sources\Redis.Client.pas',
-  Redis.Connection.Config in '..\sources\Redis.Connection.Config.pas',
-  Redis.HealthCheck in '..\sources\Redis.HealthCheck.pas',
-  Redis.Logger.Empty in '..\sources\Redis.Logger.Empty.pas',
-  Redis.Pool in '..\sources\Redis.Pool.pas',
-  Redis.Protocol in '..\sources\Redis.Protocol.pas',
-  Redis.PubSub in '..\sources\Redis.PubSub.pas',
-  Redis.Response in '..\sources\Redis.Response.pas',
-  Redis.Transport.Intf in '..\sources\Redis.Transport.Intf.pas',
-  Redis.Transport.Registry in '..\sources\Redis.Transport.Registry.pas',
-  Redis.Transport.Synapse in '..\sources\Redis.Transport.Synapse.pas',
-  Redis.Types in '..\sources\Redis.Types.pas',
-  Redis.Transport.Grijjy in '..\sources\Redis.Transport.Grijjy.pas';
+  vmRedis.Client.Intf in '..\sources\vmRedis.Client.Intf.pas',
+  vmRedis.Client in '..\sources\vmRedis.Client.pas',
+  vmRedis.Connection.Config in '..\sources\vmRedis.Connection.Config.pas',
+  vmRedis.HealthCheck in '..\sources\vmRedis.HealthCheck.pas',
+  vmRedis.Logger.Empty in '..\sources\vmRedis.Logger.Empty.pas',
+  vmRedis.Pool in '..\sources\vmRedis.Pool.pas',
+  vmRedis.Protocol in '..\sources\vmRedis.Protocol.pas',
+  vmRedis.PubSub in '..\sources\vmRedis.PubSub.pas',
+  vmRedis.Response in '..\sources\vmRedis.Response.pas',
+  vmRedis.Transport.Intf in '..\sources\vmRedis.Transport.Intf.pas',
+  vmRedis.Transport.Registry in '..\sources\vmRedis.Transport.Registry.pas',
+  vmRedis.Transport.Synapse in '..\sources\vmRedis.Transport.Synapse.pas',
+  vmRedis.Types in '..\sources\vmRedis.Types.pas',
+  vmRedis.Transport.Grijjy in '..\sources\vmRedis.Transport.Grijjy.pas';
 
 procedure Example_HealthCheck_Detailed;
 var
-  lConfig: TRedisConnectionConfig;
-  lClient: IRedisClient;
-  lLogger: IRedisLogger;
-  Health: TRedisHealthInfo;
+  lConfig: TvmRedisConnectionConfig;
+  lClient: IvmRedisClient;
+  lLogger: IvmRedisLogger;
+  Health: TvmRedisHealthInfo;
 begin
   WriteLn('=== Esempio HealthCheck Dettagliato ===');
   WriteLn;
@@ -60,13 +60,13 @@ begin
   lConfig.Host := 'localhost';
   lConfig.Port := 6379;
 
-  lLogger := TSimpleRedisLogger.New();
+  lLogger := TvmSimpleRedisLogger.New();
 
   // Usa il Transport Grijjy per la connessione
-//  lClient := TRedisClient.New(lConfig, lLogger, 'grijjy');
+//  lClient := TvmRedisClient.New(lConfig, lLogger, 'grijjy');
 
   // Usa il Transport Synapse per la connessione
-  lClient := TRedisClient.New(lConfig, lLogger, 'synapse');
+  lClient := TvmRedisClient.New(lConfig, lLogger, 'synapse');
 
   try
     WriteLn('Connessione a Redis...');
@@ -100,10 +100,10 @@ end;
 
 procedure Example_HealthCheck_Monitoring;
 var
-  lConfig: TRedisConnectionConfig;
-  lClient: IRedisClient;
-  lLogger: IRedisLogger;
-  lHealth: TRedisHealthInfo;
+  lConfig: TvmRedisConnectionConfig;
+  lClient: IvmRedisClient;
+  lLogger: IvmRedisLogger;
+  lHealth: TvmRedisHealthInfo;
   lCheckCount: Integer;
   lFailCount: Integer;
   lMaxFails: Integer;
@@ -116,8 +116,8 @@ begin
   lConfig.Port := 6379;
   lConfig.MaxRetries := 3;
 
-  lLogger := TSimpleRedisLogger.New();
-  lClient := TRedisClient.New(lConfig, lLogger, 'grijjy');
+  lLogger := TvmSimpleRedisLogger.New();
+  lClient := TvmRedisClient.New(lConfig, lLogger, 'grijjy');
 
   lCheckCount := 0;
   lFailCount := 0;

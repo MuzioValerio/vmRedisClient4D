@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.Connection.Config
+ Unit Name: vmRedis.Connection.Config
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio
  Date:      03-dic-2025
@@ -57,18 +57,20 @@
     /// </summary>
  Purpose:
  History:
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.Connection.Config;
+unit vmRedis.Connection.Config;
 
 interface
 
 uses
   System.SysUtils,
-  Redis.Types;
+  vmRedis.Types;
 
 type
-  TRedisConnectionConfig = record
+  TvmRedisConnectionConfig = record
     Host: string;
     Port: Word;
     Username: string;
@@ -90,16 +92,16 @@ type
     ClientName: string;
 
     // Managed record operators (Delphi 10.4+)
-    class operator Initialize(out Dest: TRedisConnectionConfig);
-    class operator Finalize(var Dest: TRedisConnectionConfig);
-    class operator Assign(var Dest: TRedisConnectionConfig; const [ref] Src: TRedisConnectionConfig);
+    class operator Initialize(out Dest: TvmRedisConnectionConfig);
+    class operator Finalize(var Dest: TvmRedisConnectionConfig);
+    class operator Assign(var Dest: TvmRedisConnectionConfig; const [ref] Src: TvmRedisConnectionConfig);
 
     // Factory methods
-    class function Localhost(aDatabase: Integer = 0): TRedisConnectionConfig; static;
-    class function WithAuth(const aHost: string; aPort: Word; const aPassword: string; aDatabase: Integer = 0): TRedisConnectionConfig; static;
-    class function WithACL(const aHost: string; aPort: Word; const aUsername, aPassword: string; aDatabase: Integer = 0): TRedisConnectionConfig; static;
+    class function Localhost(aDatabase: Integer = 0): TvmRedisConnectionConfig; static;
+    class function WithAuth(const aHost: string; aPort: Word; const aPassword: string; aDatabase: Integer = 0): TvmRedisConnectionConfig; static;
+    class function WithACL(const aHost: string; aPort: Word; const aUsername, aPassword: string; aDatabase: Integer = 0): TvmRedisConnectionConfig; static;
     class function WithSSL(const aHost: string; aPort: Word; const aUsername, aPassword: string; aValidateCertificate: Boolean = True):
-        TRedisConnectionConfig; static;
+        TvmRedisConnectionConfig; static;
 
     // Instance methods
     procedure Validate;
@@ -112,9 +114,9 @@ implementation
 uses
   System.IOUtils;
 
-{ TRedisConnectionConfig }
+{ TvmRedisConnectionConfig }
 
-class operator TRedisConnectionConfig.Initialize(out Dest: TRedisConnectionConfig);
+class operator TvmRedisConnectionConfig.Initialize(out Dest: TvmRedisConnectionConfig);
 begin
   // Inizializzazione automatica con valori predefiniti
   Dest.Host := DEFAULT_REDIS_HOST;
@@ -138,14 +140,14 @@ begin
   Dest.ClientName := '';
 end;
 
-class operator TRedisConnectionConfig.Finalize(var Dest: TRedisConnectionConfig);
+class operator TvmRedisConnectionConfig.Finalize(var Dest: TvmRedisConnectionConfig);
 begin
   // Pulizia se necessaria (attualmente non serve)
   // Utile se in futuro aggiungiamo risorse che necessitano cleanup
   // Ad esempio: interfacce, oggetti dinamici, ecc.
 end;
 
-class operator TRedisConnectionConfig.Assign(var Dest: TRedisConnectionConfig; const [ref] Src: TRedisConnectionConfig);
+class operator TvmRedisConnectionConfig.Assign(var Dest: TvmRedisConnectionConfig; const [ref] Src: TvmRedisConnectionConfig);
 begin
   Dest.Host := Src.Host;
   Dest.Port := Src.Port;
@@ -168,13 +170,13 @@ begin
   Dest.ClientName := Src.ClientName;
 end;
 
-class function TRedisConnectionConfig.Localhost(aDatabase: Integer): TRedisConnectionConfig;
+class function TvmRedisConnectionConfig.Localhost(aDatabase: Integer): TvmRedisConnectionConfig;
 begin
   Result.Database := aDatabase;
 end;
 
-class function TRedisConnectionConfig.WithAuth(const aHost: string; aPort: Word; const aPassword: string; aDatabase: Integer = 0):
-    TRedisConnectionConfig;
+class function TvmRedisConnectionConfig.WithAuth(const aHost: string; aPort: Word; const aPassword: string; aDatabase: Integer = 0):
+    TvmRedisConnectionConfig;
 begin
   Result.Host := aHost;
   Result.Port := aPort;
@@ -182,8 +184,8 @@ begin
   Result.Database := aDatabase;
 end;
 
-class function TRedisConnectionConfig.WithACL(const aHost: string; aPort: Word; const aUsername, aPassword: string; aDatabase: Integer):
-    TRedisConnectionConfig;
+class function TvmRedisConnectionConfig.WithACL(const aHost: string; aPort: Word; const aUsername, aPassword: string; aDatabase: Integer):
+    TvmRedisConnectionConfig;
 begin
   Result.Host := aHost;
   Result.Port := aPort;
@@ -192,8 +194,8 @@ begin
   Result.Database := aDatabase;
 end;
 
-class function TRedisConnectionConfig.WithSSL(const aHost: string; aPort: Word; const aUsername, aPassword: string; aValidateCertificate: Boolean =
-    True): TRedisConnectionConfig;
+class function TvmRedisConnectionConfig.WithSSL(const aHost: string; aPort: Word; const aUsername, aPassword: string; aValidateCertificate: Boolean =
+    True): TvmRedisConnectionConfig;
 begin
   Result.Host := aHost;
   Result.Port := aPort;
@@ -203,49 +205,49 @@ begin
   Result.ValidateSSLCertificate := aValidateCertificate;
 end;
 
-procedure TRedisConnectionConfig.Validate;
+procedure TvmRedisConnectionConfig.Validate;
 begin
   if Host.Trim.IsEmpty then
-    raise ERedisConfigException.Create('Host non può essere vuoto');
+    raise EvmRedisConfigException.Create('Host non può essere vuoto');
 
   if Port = 0 then
-    raise ERedisConfigException.Create('Port deve essere maggiore di 0');
+    raise EvmRedisConfigException.Create('Port deve essere maggiore di 0');
 
   if Database < 0 then
-    raise ERedisConfigException.Create('Database non può essere negativo');
+    raise EvmRedisConfigException.Create('Database non può essere negativo');
 
   if ConnectionTimeout < 0 then
-    raise ERedisConfigException.Create('ConnectionTimeout non può essere negativo');
+    raise EvmRedisConfigException.Create('ConnectionTimeout non può essere negativo');
 
   if ReadTimeout < 0 then
-    raise ERedisConfigException.Create('ReadTimeout non può essere negativo');
+    raise EvmRedisConfigException.Create('ReadTimeout non può essere negativo');
 
   if WriteTimeout < 0 then
-    raise ERedisConfigException.Create('WriteTimeout non può essere negativo');
+    raise EvmRedisConfigException.Create('WriteTimeout non può essere negativo');
 
   if MaxRetries < 0 then
-    raise ERedisConfigException.Create('MaxRetries non può essere negativo');
+    raise EvmRedisConfigException.Create('MaxRetries non può essere negativo');
 
   if RetryDelayMs < 0 then
-    raise ERedisConfigException.Create('RetryDelayMs non può essere negativo');
+    raise EvmRedisConfigException.Create('RetryDelayMs non può essere negativo');
 
   if UseSSL and (ClientCertificatePath.Trim <> '') then
   begin
     if not TFile.Exists(ClientCertificatePath.Trim) then
-      raise ERedisConfigException.Create('Certificato client non trovato: ' + ClientCertificatePath.Trim);
+      raise EvmRedisConfigException.Create('Certificato client non trovato: ' + ClientCertificatePath.Trim);
   end;
 
   if ClusterMode and (ClusterNodes.Trim.IsEmpty) then
-    raise ERedisConfigException.Create('ClusterNodes deve essere specificato in modalità cluster');
+    raise EvmRedisConfigException.Create('ClusterNodes deve essere specificato in modalità cluster');
 end;
 
-function TRedisConnectionConfig.ToConnectionString: string;
+function TvmRedisConnectionConfig.ToConnectionString: string;
 begin
   // Validazione parametri obbligatori
   if Host.Trim.IsEmpty then
-    raise ERedisConfigException.Create('Host non può essere vuoto');
+    raise EvmRedisConfigException.Create('Host non può essere vuoto');
   if Port <= 0 then
-    raise ERedisConfigException.Create('Port deve essere maggiore di zero');
+    raise EvmRedisConfigException.Create('Port deve essere maggiore di zero');
 
   var lBuilder := TStringBuilder.Create;
   try

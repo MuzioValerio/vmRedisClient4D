@@ -119,7 +119,7 @@
         <DCCReference Include="..\synapse\blcksock.pas"/>
         <DCCReference Include="..\synapse\ssl_openssl3_lib.pas"/>
         <DCCReference Include="..\synapse\ssl_openssl3.pas"/>
-        <DCCReference Include="..\sources\Redis.Transport.Synapse.pas"/>
+        <DCCReference Include="..\sources\vmRedis.Transport.Synapse.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>

@@ -1,6 +1,6 @@
 ﻿{-----------------------------------------------------------------------------
  Project: vmRedisClient
- Unit Name: Redis.PubSub
+ Unit Name: vmRedis.PubSub
  Copyright (C) 2025-2026 Muzio Valerio
  Author:    Muzio Valerio
  Date:      14-dic-2025
@@ -20,27 +20,29 @@
  Info:
  Purpose:
  History:
-  - Updated:   2026 - Usa IRedisTransport invece di IRedisSynapseTransport diretto,
+  - Updated:   2026 - Usa IvmRedisTransport invece di IvmRedisSynapseTransport diretto,
                       crea il transport tramite Registry (provider configurabile)
+ - Updated:   12/11/2026 - v3.0: unit rinominata da Redis.* a vmRedis.* e prefisso vm
+   su tutti i tipi pubblici, per convivere con delphiredisclient (punto 28)
 -----------------------------------------------------------------------------}
 
-unit Redis.PubSub;
+unit vmRedis.PubSub;
 
 interface
 
 uses
   System.SysUtils, System.Classes, System.Generics.Collections,
-  Redis.Types,
-  Redis.Response,
-  Redis.Protocol,
-  Redis.Transport.Intf,
-  Redis.Transport.Registry,
-  Redis.Connection.Config;
+  vmRedis.Types,
+  vmRedis.Response,
+  vmRedis.Protocol,
+  vmRedis.Transport.Intf,
+  vmRedis.Transport.Registry,
+  vmRedis.Connection.Config;
 
 type
   // Record che rappresenta un messaggio Pub/Sub
-  TRedisPubSubMessage = record
-    MessageType: TRedisMessageType;
+  TvmRedisPubSubMessage = record
+    MessageType: TvmRedisMessageType;
     Channel: string;
     Pattern: string;   // solo per PMESSAGE
     Payload: string;
@@ -48,18 +50,18 @@ type
   end;
 
   // Callback per la gestione dei messaggi
-  TRedisMessageCallback = reference to procedure(const aMessage: TRedisPubSubMessage);
+  TvmRedisMessageCallback = reference to procedure(const aMessage: TvmRedisPubSubMessage);
 
   // Interfaccia per il subscriber
-  IRedisPubSubClient = interface(IInterface)
+  IvmRedisPubSubClient = interface(IInterface)
   ['{CFA6A9B3-6106-41DD-9107-9684997B1D1C}']
     procedure Connect;
     procedure Disconnect;
     function  IsConnected: Boolean;
 
-    procedure Subscribe(const aChannels: array of string; aCallback: TRedisMessageCallback);
+    procedure Subscribe(const aChannels: array of string; aCallback: TvmRedisMessageCallback);
     procedure Unsubscribe(const aChannels: array of string);
-    procedure PSubscribe(const aPatterns: array of string; aCallback: TRedisMessageCallback);
+    procedure PSubscribe(const aPatterns: array of string; aCallback: TvmRedisMessageCallback);
     procedure PUnsubscribe(const aPatterns: array of string);
 
     procedure StartListening;
@@ -70,7 +72,7 @@ type
   end;
 
   // Interfaccia per il publisher
-  IRedisPubSubPublisher = interface(IInterface)
+  IvmRedisPubSubPublisher = interface(IInterface)
   ['{8455FF49-CBED-4370-AC08-82E2279A9727}']
     procedure Connect;
     procedure Disconnect;
@@ -83,49 +85,49 @@ type
   end;
 
   // Implementazione Subscriber
-  TRedisPubSubClient = class(TInterfacedObject, IRedisPubSubClient)
+  TvmRedisPubSubClient = class(TInterfacedObject, IvmRedisPubSubClient)
   strict private
-    FTransport: IRedisTransport;
-    FParser: TRedisProtocolParser;
-    FConfig: TRedisConnectionConfig;
-    FLogger: IRedisLogger;
-    FCallback: TRedisMessageCallback;
+    FTransport: IvmRedisTransport;
+    FParser: TvmRedisProtocolParser;
+    FConfig: TvmRedisConnectionConfig;
+    FLogger: IvmRedisLogger;
+    FCallback: TvmRedisMessageCallback;
     FIsListening: Boolean;
     FStopRequested: Boolean;
     FSubscribedChannels: TList<string>;
     FSubscribedPatterns: TList<string>;
 
-    function  ParsePubSubMessage(aResponse: IRedisResponse): TRedisPubSubMessage;
+    function  ParsePubSubMessage(aResponse: IvmRedisResponse): TvmRedisPubSubMessage;
     procedure SendCommand(const aParts: array of string);
-    procedure ProcessMessage(const aMessage: TRedisPubSubMessage);
+    procedure ProcessMessage(const aMessage: TvmRedisPubSubMessage);
   private
     procedure Connect;
     procedure Disconnect;
     function  IsConnected: Boolean;
-    procedure Subscribe(const aChannels: array of string; aCallback: TRedisMessageCallback);
+    procedure Subscribe(const aChannels: array of string; aCallback: TvmRedisMessageCallback);
     procedure Unsubscribe(const aChannels: array of string);
-    procedure PSubscribe(const aPatterns: array of string; aCallback: TRedisMessageCallback);
+    procedure PSubscribe(const aPatterns: array of string; aCallback: TvmRedisMessageCallback);
     procedure PUnsubscribe(const aPatterns: array of string);
     procedure StartListening;
     procedure StopListening;
     function  GetIsListening: Boolean;
   public
-    constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; const aProvider:  string = 'synapse');
+    constructor Create(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil; const aProvider:  string = 'synapse');
     destructor Destroy; override;
 
     property IsListening: Boolean read GetIsListening;
   end;
 
   // Implementazione Publisher
-  TRedisPubSubPublisher = class(TInterfacedObject, IRedisPubSubPublisher)
+  TvmRedisPubSubPublisher = class(TInterfacedObject, IvmRedisPubSubPublisher)
   strict private
-    FTransport: IRedisTransport;
-    FParser: TRedisProtocolParser;
-    FConfig: TRedisConnectionConfig;
-    FLogger: IRedisLogger;
+    FTransport: IvmRedisTransport;
+    FParser: TvmRedisProtocolParser;
+    FConfig: TvmRedisConnectionConfig;
+    FLogger: IvmRedisLogger;
 
-    function ExecuteAndParse(const aParts: array of string): IRedisResponse;
-    function ResponseToStringArray(aResponse: IRedisResponse): TArray<string>;
+    function ExecuteAndParse(const aParts: array of string): IvmRedisResponse;
+    function ResponseToStringArray(aResponse: IvmRedisResponse): TArray<string>;
   private
     procedure Connect;
     procedure Disconnect;
@@ -135,18 +137,18 @@ type
     function  PubSubNumSub(const aChannels: array of string): TDictionary<string, Integer>;
     function  PubSubNumPat: Integer;
   public
-    constructor Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger = nil; const aProvider: string = 'synapse');
+    constructor Create(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger = nil; const aProvider: string = 'synapse');
     destructor Destroy; override;
   end;
 
   // Thread per ascolto asincrono
-  TRedisPubSubListenerThread = class(TThread)
+  TvmRedisPubSubListenerThread = class(TThread)
   private
-    FClient: IRedisPubSubClient;
+    FClient: IvmRedisPubSubClient;
   protected
     procedure Execute; override;
   public
-    constructor Create(aClient: IRedisPubSubClient);
+    constructor Create(aClient: IvmRedisPubSubClient);
   end;
 
 implementation
@@ -154,22 +156,22 @@ implementation
 uses
   System.StrUtils;
 
-{ TRedisPubSubClient }
+{ TvmRedisPubSubClient }
 
-constructor TRedisPubSubClient.Create(const aConfig: TRedisConnectionConfig; aLogger: IRedisLogger; const aProvider: string);
+constructor TvmRedisPubSubClient.Create(const aConfig: TvmRedisConnectionConfig; aLogger: IvmRedisLogger; const aProvider: string);
 begin
   inherited Create;
   FConfig := aConfig;
   FLogger := aLogger;
-  FTransport := TRedisTransportRegistry.Acquire(aProvider, aConfig, aLogger);
-  FParser := TRedisProtocolParser.Create(FTransport);
+  FTransport := TvmRedisTransportRegistry.Acquire(aProvider, aConfig, aLogger);
+  FParser := TvmRedisProtocolParser.Create(FTransport);
   FIsListening := False;
   FStopRequested := False;
   FSubscribedChannels := TList<string>.Create;
   FSubscribedPatterns := TList<string>.Create;
 end;
 
-destructor TRedisPubSubClient.Destroy;
+destructor TvmRedisPubSubClient.Destroy;
 begin
   StopListening;
   Disconnect;
@@ -179,13 +181,13 @@ begin
   inherited;
 end;
 
-procedure TRedisPubSubClient.Connect;
+procedure TvmRedisPubSubClient.Connect;
 begin
   FTransport.Connect;
   if Assigned(FLogger) then FLogger.LogInfo('PubSub Client connesso');
 end;
 
-procedure TRedisPubSubClient.Disconnect;
+procedure TvmRedisPubSubClient.Disconnect;
 begin
   StopListening;
   FTransport.Disconnect;
@@ -193,22 +195,22 @@ begin
     FLogger.LogInfo('PubSub Client disconnesso');
 end;
 
-function TRedisPubSubClient.IsConnected: Boolean;
+function TvmRedisPubSubClient.IsConnected: Boolean;
 begin 
   Result := FTransport.IsConnected; 
 end;
 
-procedure TRedisPubSubClient.SendCommand(const aParts: array of string);
+procedure TvmRedisPubSubClient.SendCommand(const aParts: array of string);
 begin
   if not IsConnected then 
-    raise ERedisConnectionException.Create('Client non connesso');
+    raise EvmRedisConnectionException.Create('Client non connesso');
   FTransport.SendCommand(aParts);
 end;
 
-procedure TRedisPubSubClient.Subscribe(const aChannels: array of string; aCallback: TRedisMessageCallback);
+procedure TvmRedisPubSubClient.Subscribe(const aChannels: array of string; aCallback: TvmRedisMessageCallback);
 begin
   if Length(aChannels) = 0 then 
-    raise ERedisValidationException.Create('Specificare almeno un canale');
+    raise EvmRedisValidationException.Create('Specificare almeno un canale');
   FCallback := aCallback;
   var lCmd := TList<string>.Create;
   try
@@ -227,7 +229,7 @@ begin
   end;
 end;
 
-procedure TRedisPubSubClient.Unsubscribe(const aChannels: array of string);
+procedure TvmRedisPubSubClient.Unsubscribe(const aChannels: array of string);
 begin
   var lCmd := TList<string>.Create;
   try
@@ -248,10 +250,10 @@ begin
   end;
 end;
 
-procedure TRedisPubSubClient.PSubscribe(const aPatterns: array of string; aCallback: TRedisMessageCallback);
+procedure TvmRedisPubSubClient.PSubscribe(const aPatterns: array of string; aCallback: TvmRedisMessageCallback);
 begin
   if Length(aPatterns) = 0 then 
-    raise ERedisValidationException.Create('Specificare almeno un pattern');
+    raise EvmRedisValidationException.Create('Specificare almeno un pattern');
   FCallback := aCallback;
   var lCmd := TList<string>.Create;
   try
@@ -270,7 +272,7 @@ begin
   end;
 end;
 
-procedure TRedisPubSubClient.PUnsubscribe(const aPatterns: array of string);
+procedure TvmRedisPubSubClient.PUnsubscribe(const aPatterns: array of string);
 begin
   var lCmd := TList<string>.Create;
   try
@@ -291,18 +293,18 @@ begin
   end;
 end;
 
-function TRedisPubSubClient.ParsePubSubMessage(aResponse: IRedisResponse): TRedisPubSubMessage;
+function TvmRedisPubSubClient.ParsePubSubMessage(aResponse: IvmRedisResponse): TvmRedisPubSubMessage;
 var
-  lItems: TArray<IRedisResponse>;
+  lItems: TArray<IvmRedisResponse>;
   lItemCount: Integer;
 begin
   lItems := aResponse.AsArray;
   lItemCount := Length(lItems);
   if lItemCount < 2 then
-    raise ERedisProtocolException.Create('Formato messaggio Pub/Sub non valido');
+    raise EvmRedisProtocolException.Create('Formato messaggio Pub/Sub non valido');
 
   FillChar(Result, SizeOf(Result), 0);
-  Result.MessageType := TRedisMessageType.FromString(lItems[0].AsString.ToLower);
+  Result.MessageType := TvmRedisMessageType.FromString(lItems[0].AsString.ToLower);
 
   case Result.MessageType of
     rmtMessage:
@@ -333,7 +335,7 @@ begin
   end;
 end;
 
-procedure TRedisPubSubClient.ProcessMessage(const aMessage: TRedisPubSubMessage);
+procedure TvmRedisPubSubClient.ProcessMessage(const aMessage: TvmRedisPubSubMessage);
 begin
   if Assigned(FCallback) then
     try
@@ -345,12 +347,12 @@ begin
     end;
 end;
 
-procedure TRedisPubSubClient.StartListening;
+procedure TvmRedisPubSubClient.StartListening;
 begin
   if FIsListening then 
     Exit;
   if not IsConnected then 
-    raise ERedisConnectionException.Create('Client non connesso');
+    raise EvmRedisConnectionException.Create('Client non connesso');
 
   FIsListening := True;
   FStopRequested := False;
@@ -384,67 +386,67 @@ begin
   end;
 end;
 
-procedure TRedisPubSubClient.StopListening;
+procedure TvmRedisPubSubClient.StopListening;
 begin
   FStopRequested := True;
   FIsListening := False;
 end;
 
-function TRedisPubSubClient.GetIsListening: Boolean;
+function TvmRedisPubSubClient.GetIsListening: Boolean;
 begin 
   Result := FIsListening; 
 end;
 
-{ TRedisPubSubPublisher }
+{ TvmRedisPubSubPublisher }
 
-constructor TRedisPubSubPublisher.Create(const aConfig:   TRedisConnectionConfig; aLogger: IRedisLogger; const aProvider: string);
+constructor TvmRedisPubSubPublisher.Create(const aConfig:   TvmRedisConnectionConfig; aLogger: IvmRedisLogger; const aProvider: string);
 begin
   inherited Create;
   FConfig := aConfig;
   FLogger := aLogger;
-  FTransport := TRedisTransportRegistry.Acquire(aProvider, aConfig, aLogger);
-  FParser := TRedisProtocolParser.Create(FTransport);
+  FTransport := TvmRedisTransportRegistry.Acquire(aProvider, aConfig, aLogger);
+  FParser := TvmRedisProtocolParser.Create(FTransport);
 end;
 
-destructor TRedisPubSubPublisher.Destroy;
+destructor TvmRedisPubSubPublisher.Destroy;
 begin
   Disconnect;
   FreeAndNil(FParser);
   inherited;
 end;
 
-procedure TRedisPubSubPublisher.Connect;
+procedure TvmRedisPubSubPublisher.Connect;
 begin
   FTransport.Connect;
   if Assigned(FLogger) then 
     FLogger.LogInfo('Publisher connesso');
 end;
 
-procedure TRedisPubSubPublisher.Disconnect;
+procedure TvmRedisPubSubPublisher.Disconnect;
 begin
   FTransport.Disconnect;
   if Assigned(FLogger) then 
     FLogger.LogInfo('Publisher disconnesso');
 end;
 
-function TRedisPubSubPublisher.IsConnected: Boolean;
+function TvmRedisPubSubPublisher.IsConnected: Boolean;
 begin 
   Result := FTransport.IsConnected; 
 end;
 
-function TRedisPubSubPublisher.ExecuteAndParse(const aParts: array of string): IRedisResponse;
+function TvmRedisPubSubPublisher.ExecuteAndParse(const aParts: array of string): IvmRedisResponse;
 begin
   if not IsConnected then 
-    raise ERedisConnectionException.Create('Publisher non connesso');
+    raise EvmRedisConnectionException.Create('Publisher non connesso');
   FTransport.SendCommand(aParts);
   Result := FParser.Parse;
   if Result.IsError then 
-    raise ERedisCommandException.Create(Result.GetErrorMessage);
+    raise EvmRedisCommandException.Create(Result.GetErrorMessage);
 end;
 
-function TRedisPubSubPublisher.ResponseToStringArray(aResponse: IRedisResponse): TArray<string>; 
+function TvmRedisPubSubPublisher.ResponseToStringArray(aResponse: IvmRedisResponse): TArray<string>; 
 var 
-  lItems: TArray<IRedisResponse>;
+  lItems: TArray<IvmRedisResponse>;
 begin
   if aResponse.IsNull then 
   begin 
@@ -457,16 +459,16 @@ begin
     Result[I] := lItems[I].AsString;
 end;
 
-function TRedisPubSubPublisher.Publish(const aChannel, aMessage: string): Integer;
+function TvmRedisPubSubPublisher.Publish(const aChannel, aMessage: string): Integer;
 begin
   if aChannel.Trim = '' then 
-    raise ERedisValidationException.Create('Il canale non può essere vuoto');
+    raise EvmRedisValidationException.Create('Il canale non può essere vuoto');
   Result := ExecuteAndParse(['PUBLISH', aChannel, aMessage]).AsInteger;
   if Assigned(FLogger) then 
     FLogger.LogInfo(Format('Pubblicato su "%s": %d subscriber', [aChannel, Result]));
 end;
 
-function TRedisPubSubPublisher.PubSubChannels(const aPattern: string): TArray<string>;
+function TvmRedisPubSubPublisher.PubSubChannels(const aPattern: string): TArray<string>;
 begin
   if aPattern = '' then
     Result := ResponseToStringArray(ExecuteAndParse(['PUBSUB', 'CHANNELS']))
@@ -474,7 +476,7 @@ begin
     Result := ResponseToStringArray(ExecuteAndParse(['PUBSUB', 'CHANNELS', aPattern]));
 end;
 
-function TRedisPubSubPublisher.PubSubNumSub(const aChannels: array of string): TDictionary<string, Integer>;
+function TvmRedisPubSubPublisher.PubSubNumSub(const aChannels: array of string): TDictionary<string, Integer>;
 begin
   Result := TDictionary<string, Integer>.Create;
   var lCmd := TList<string>.Create;
@@ -495,21 +497,21 @@ begin
   end;
 end;
 
-function TRedisPubSubPublisher.PubSubNumPat: Integer;
+function TvmRedisPubSubPublisher.PubSubNumPat: Integer;
 begin 
   Result := ExecuteAndParse(['PUBSUB', 'NUMPAT']).AsInteger; 
 end;
 
-{ TRedisPubSubListenerThread }
+{ TvmRedisPubSubListenerThread }
 
-constructor TRedisPubSubListenerThread.Create(aClient: IRedisPubSubClient);
+constructor TvmRedisPubSubListenerThread.Create(aClient: IvmRedisPubSubClient);
 begin
   inherited Create(True);
   FreeOnTerminate := False;
   FClient := aClient;
 end;
 
-procedure TRedisPubSubListenerThread.Execute;
+procedure TvmRedisPubSubListenerThread.Execute;
 begin
   if Assigned(FClient) then 
     FClient.StartListening;

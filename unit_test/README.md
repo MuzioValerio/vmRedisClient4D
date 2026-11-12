@@ -16,9 +16,9 @@ Complete DUnitX test suite for **vmRedisClient**, a native Redis client written 
 
 | Fixture | Tests | Outcome |
 |---|---|---|
-| `TRedisClientTests` | 128 | ✅ All passed |
-| `TRedisPoolTests` | 26 | ✅ All passed |
-| `TRedisPubSubTests` | 23 | ✅ All passed |
+| `TvmRedisClientTests` | 128 | ✅ All passed |
+| `TvmRedisPoolTests` | 26 | ✅ All passed |
+| `TvmRedisPubSubTests` | 23 | ✅ All passed |
 | **Total** | **177** | ✅ **0 failed / 0 errors** |
 
 > Last run with Synapse Transport: 2026-04-06 — Total duration: \~88 seconds<br>
@@ -36,7 +36,7 @@ Complete DUnitX test suite for **vmRedisClient**, a native Redis client written 
 | Synapse | Installed in the search path |
 | GrijjyFoundation | Installed in the search path |
 
-> The Redis server must be started **without a password** (or update `TRedisConnectionConfig` in the test files).
+> The Redis server must be started **without a password** (or update `TvmRedisConnectionConfig` in the test files).
 
 ---
 
@@ -46,9 +46,9 @@ Complete DUnitX test suite for **vmRedisClient**, a native Redis client written 
 unit_test/
 ├── RedisClientTests.dpr          # Main test suite program
 ├── RedisClientTests.dproj        # Delphi project file
-├── Redis.Client.Tests.pas        # Tests for IRedisClient (128 tests)
-├── Redis.Pool.Tests.pas          # Tests for the connection pool (26 tests)
-└── Redis.PubSub.Tests.pas        # Tests for Pub/Sub (23 tests)
+├── vmRedis.Client.Tests.pas        # Tests for IvmRedisClient (128 tests)
+├── vmRedis.Pool.Tests.pas          # Tests for the connection pool (26 tests)
+└── vmRedis.PubSub.Tests.pas        # Tests for Pub/Sub (23 tests)
 ```
 
 The project references the Redis client units from the `..\sources\` folder.
@@ -85,7 +85,7 @@ RedisClientTests.exe -output:console -xml:TestResults.xml
 RedisClientTests.exe -help
 
 # Run specific fixture
-RedisClientTests.exe -fixture:TRedisClientTests
+RedisClientTests.exe -fixture:TvmRedisClientTests
 
 # Run a single test
 RedisClientTests.exe -test:Test_SetGet_SimpleValue
@@ -104,9 +104,9 @@ The runner displays a banner, waits for ENTER to be pressed, runs all tests, and
 
 ---
 
-## Fixture 1 — `TRedisClientTests` (128 tests)
+## Fixture 1 — `TvmRedisClientTests` (128 tests)
 
-Comprehensive tests for `IRedisClient`, organized by category.
+Comprehensive tests for `IvmRedisClient`, organized by category.
 
 ### Connection (5 tests)
 | Test | Description |
@@ -215,7 +215,7 @@ Verify exceptions on: empty key, negative expiration, empty array.
 
 ---
 
-## Fixture 2 — `TRedisPoolTests` (26 tests)
+## Fixture 2 — `TvmRedisPoolTests` (26 tests)
 
 Tests for the thread-safe connection pool.
 
@@ -270,7 +270,7 @@ Tests for the thread-safe connection pool.
 | `Test_PoolHelper_ExecuteFunction` | Helper with function |
 | `Test_PoolHelper_ExecuteProcedure` | Helper with procedure |
 | `Test_PoolHelper_ExceptionHandling` | Exception handling in helper |
-| `Test_PooledClient_AutoRelease` | Automatic release of `TPooledRedisClient` |
+| `Test_PooledClient_AutoRelease` | Automatic release of `TvmPooledRedisClient` |
 | `Test_PooledClient_ManualRelease` | Manual release |
 
 ### Shutdown (2 tests)
@@ -281,7 +281,7 @@ Tests for the thread-safe connection pool.
 
 ---
 
-## Fixture 3 — `TRedisPubSubTests` (23 tests)
+## Fixture 3 — `TvmRedisPubSubTests` (23 tests)
 
 Tests for the Pub/Sub system, publisher, subscriber, patterns, and the listener thread.
 
@@ -316,15 +316,15 @@ Tests for the Pub/Sub system, publisher, subscriber, patterns, and the listener 
 ### Thread Listener (2 tests)
 | Test | Description |
 |---|---|
-| `Test_Listener_StartStop` | Start and stop `TRedisPubSubListenerThread` |
+| `Test_Listener_StartStop` | Start and stop `TvmRedisPubSubListenerThread` |
 | `Test_Listener_ReceiveInBackground` | Receive messages in a background thread |
 
-### Factory Methods on IRedisClient (3 tests)
+### Factory Methods on IvmRedisClient (3 tests)
 | Test | Description |
 |---|---|
-| `Test_Client_CreatePublisher` | `IRedisClient.CreatePublisher` |
-| `Test_Client_CreateSubscriber` | `IRedisClient.CreateSubscriber` |
-| `Test_Client_Publish_DirectMethod` | Direct `IRedisClient.Publish` |
+| `Test_Client_CreatePublisher` | `IvmRedisClient.CreatePublisher` |
+| `Test_Client_CreateSubscriber` | `IvmRedisClient.CreateSubscriber` |
+| `Test_Client_Publish_DirectMethod` | Direct `IvmRedisClient.Publish` |
 
 ### Validations (2 tests)
 | Test | Description |
@@ -337,21 +337,21 @@ Tests for the Pub/Sub system, publisher, subscriber, patterns, and the listener 
 ## Client Architecture
 
 ```
-Redis.Client.Intf           IRedisClient interface (all Redis commands)
-Redis.Client                TRedisClient implementation
-Redis.Connection.Config     Connection configuration (host, port, auth, SSL, timeout)
-Redis.HealthCheck           Health check with metrics (ping, latency, info)
-Redis.Logger.Empty          Empty Logger implementation for always passing a Logger
-Redis.Pool                  Thread-safe connection pool with TPooledRedisClient
-Redis.Protocol              RESP2 parser, IRedisSynapseTransport
-Redis.PubSub                Publisher (IRedisPubSubPublisher) and
-                            Subscriber (IRedisPubSubClient) with listener thread
-Redis.Response              IRedisResponse implementation
-Redis.Transport.Grijjy      TCP/SSL layer based on GrijjyFoundation
-Redis.Transport.Intf        Common interface for Transport management
-Redis.Transport.Registry    Factory where Transports self-register to be used
-Redis.Transport.Synapse     TCP/SSL layer based on Synapse
-Redis.Types                 Types, constants, exceptions, IRedisLogger, IRedisResponse
+vmRedis.Client.Intf           IvmRedisClient interface (all Redis commands)
+vmRedis.Client                TvmRedisClient implementation
+vmRedis.Connection.Config     Connection configuration (host, port, auth, SSL, timeout)
+vmRedis.HealthCheck           Health check with metrics (ping, latency, info)
+vmRedis.Logger.Empty          Empty Logger implementation for always passing a Logger
+vmRedis.Pool                  Thread-safe connection pool with TvmPooledRedisClient
+vmRedis.Protocol              RESP2 parser, IvmRedisSynapseTransport
+vmRedis.PubSub                Publisher (IvmRedisPubSubPublisher) and
+                            Subscriber (IvmRedisPubSubClient) with listener thread
+vmRedis.Response              IvmRedisResponse implementation
+vmRedis.Transport.Grijjy      TCP/SSL layer based on GrijjyFoundation
+vmRedis.Transport.Intf        Common interface for Transport management
+vmRedis.Transport.Registry    Factory where Transports self-register to be used
+vmRedis.Transport.Synapse     TCP/SSL layer based on Synapse
+vmRedis.Types                 Types, constants, exceptions, IvmRedisLogger, IvmRedisResponse
 ```
 
 ---
@@ -359,7 +359,7 @@ Redis.Types                 Types, constants, exceptions, IRedisLogger, IRedisRe
 ## Technical Notes
 
 - Pub/Sub tests use `TTask` (PPL) to simulate asynchronous subscribers
-- The Pub/Sub listener runs in a dedicated thread (`TRedisPubSubListenerThread`)
+- The Pub/Sub listener runs in a dedicated thread (`TvmRedisPubSubListenerThread`)
 - Channels used in tests have a `test:` prefix to avoid collisions
 - `Test_Messaging_MultipleSubscribers` uses a runtime-unique channel name (`GetTickCount`) to prevent zombie subscriptions from previous runs
 - XML output is NUnit-compatible for CI/CD integration
@@ -425,7 +425,7 @@ redis-cli FLUSHDB
 
 # Or use a dedicated database for tests
 # Modify Setup:
-FConfig := TRedisConnectionConfig.Localhost(15);  // Database 15 for tests
+FConfig := TvmRedisConnectionConfig.Localhost(15);  // Database 15 for tests
 ```
 
 ### Tests Fail on CI/CD
@@ -469,7 +469,7 @@ jobs:
 
 ```delphi
 [Test]
-procedure TRedisClientTests.Test_MyNewFeature;
+procedure TvmRedisClientTests.Test_MyNewFeature;
 begin
   // Arrange (Setup)
   FClient.SetValue('test:key', 'value');
