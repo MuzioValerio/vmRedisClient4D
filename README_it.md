@@ -1,4 +1,10 @@
-                              # vmRedisClient
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-vmredisclient4d-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo-vmredisclient4d-light.svg">
+    <img alt="vmRedisClient4D — Client Redis nativo per Delphi" src="assets/logo-vmredisclient4d-light.svg" width="560">
+  </picture>
+</p>
 
 ![Delphi](https://img.shields.io/badge/Delphi-10.4+-red.svg)
 ![Redis](https://img.shields.io/badge/Redis-6.x%20|%207.x%20|%208.x-DC382D.svg)
